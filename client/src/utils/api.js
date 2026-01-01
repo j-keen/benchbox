@@ -642,26 +642,37 @@ export const tagsApi = {
     }
 };
 
-// YouTube 비디오 ID 추출 (클라이언트에서 직접 처리)
+// YouTube 비디오 ID 추출 (폴백용)
 function extractYouTubeVideoId(url) {
-    // youtube.com/watch?v=VIDEO_ID
     let match = url.match(/youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/);
     if (match) return match[1];
-
-    // youtu.be/VIDEO_ID
     match = url.match(/youtu\.be\/([a-zA-Z0-9_-]+)/);
     if (match) return match[1];
-
-    // youtube.com/shorts/VIDEO_ID
     match = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]+)/);
     if (match) return match[1];
-
     return null;
 }
 
-// URL 파싱 API (클라이언트에서 직접 처리, 서버 불필요)
+// URL 파싱 API (서버 API 호출, 실패시 클라이언트 폴백)
 export const parseUrlApi = {
     parse: async (url) => {
+        // 서버 API 호출 시도
+        try {
+            const response = await fetch('/api/parse-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                return { data };
+            }
+        } catch (e) {
+            console.log('서버 API 실패, 클라이언트 폴백 사용:', e.message);
+        }
+
+        // 폴백: 클라이언트에서 직접 처리
         const urlInfo = analyzeUrl(url);
 
         // YouTube인 경우 썸네일 직접 생성
