@@ -130,7 +130,16 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
         return { likes, comments };
     };
 
+    // description에서 작성자 추출 (author 필드가 없을 경우)
+    const parseAuthor = (description) => {
+        if (!description) return null;
+        // "작성자: @username" 또는 "by @username" 패턴
+        const match = description.match(/(?:작성자|by)[:\s]*(@?\w+)/i);
+        return match ? match[1] : null;
+    };
+
     const stats = parseStats(video.description);
+    const author = video.author || parseAuthor(video.description);
 
     const handleCheckClick = (e) => {
         e.stopPropagation();
@@ -234,9 +243,16 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
                     {video.title || 'Untitled'}
                 </h3>
 
+                {/* 작성자 정보 */}
+                {author && (
+                    <div className="mt-1 text-xs text-gray-500 truncate">
+                        {author}
+                    </div>
+                )}
+
                 {/* 통계 정보 (좋아요, 댓글) */}
                 {stats && (
-                    <div className="mt-1 flex items-center gap-3 text-xs text-gray-500">
+                    <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
                         {stats.likes && (
                             <span className="flex items-center gap-1">
                                 <span>❤️</span>

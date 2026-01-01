@@ -71,13 +71,35 @@ function extractYouTubeVideoId(url) {
     return null;
 }
 
+// URL에서 작성자 핸들 추출
+function extractAuthorHandle(url) {
+    // TikTok: tiktok.com/@username/video/...
+    let match = url.match(/tiktok\.com\/@([^/?]+)/);
+    if (match) return `@${match[1]}`;
+
+    // Instagram: instagram.com/username/...
+    match = url.match(/instagram\.com\/([a-zA-Z0-9_.-]+)/);
+    if (match && !['p', 'reel', 'reels', 'stories'].includes(match[1])) {
+        return `@${match[1]}`;
+    }
+
+    // YouTube: youtube.com/@username
+    match = url.match(/youtube\.com\/@([^/?]+)/);
+    if (match) return `@${match[1]}`;
+
+    return null;
+}
+
 // OG 태그 파싱
-async function fetchOgTags(url, platform) {
+async function fetchOgTags(url, platform, type) {
     try {
-        // YouTube 특수 처리
+        const authorHandle = extractAuthorHandle(url);
+
+        // YouTube 영상 처리
         if (platform === 'youtube') {
             const videoId = extractYouTubeVideoId(url);
             if (videoId) {
+                // 영상인 경우
                 const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 
                 try {
@@ -93,27 +115,121 @@ async function fetchOgTags(url, platform) {
                                  $('title').text()?.replace(' - YouTube', '') || 'YouTube Video';
                     const description = $('meta[property="og:description"]').attr('content') || '';
 
-                    return { title, description, thumbnail };
+                    // 채널명 추출 시도
+                    const channelName = $('link[itemprop="name"]').attr('content') ||
+                                       $('span[itemprop="author"] link[itemprop="name"]').attr('content') || '';
+
+                    return {
+                        title,
+                        description,
+                        thumbnail,
+                        author: channelName || authorHandle
+                    };
                 } catch {
-                    return { title: 'YouTube Video', description: '', thumbnail };
+                    return { title: 'YouTube Video', description: '', thumbnail, author: authorHandle };
                 }
+            }
+
+            // 채널인 경우 (videoId가 없음)
+            try {
+                const response = await axios.get(url, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)',
+                        'Accept-Language': 'ko-KR,ko;q=0.9'
+                    },
+                    timeout: 8000
+                });
+                const $ = cheerio.load(response.data);
+                const title = $('meta[property="og:title"]').attr('content') ||
+                             $('title').text()?.replace(' - YouTube', '') || 'YouTube Channel';
+                const description = $('meta[property="og:description"]').attr('content') || '';
+                const thumbnail = $('meta[property="og:image"]').attr('content') || '';
+
+                return { title, description, thumbnail, author: authorHandle };
+            } catch {
+                return { title: 'YouTube Channel', description: '', thumbnail: '', author: authorHandle };
             }
         }
 
-        // TikTok oEmbed
+        // TikTok 영상 - oEmbed 사용
         if (platform === 'tiktok' && url.includes('/video/')) {
             try {
                 const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
                 const response = await axios.get(oembedUrl, { timeout: 8000 });
                 if (response.data) {
+                    const author = response.data.author_name || authorHandle;
                     return {
-                        title: response.data.title || response.data.author_name || 'TikTok',
-                        description: response.data.author_name ? `by ${response.data.author_name}` : '',
-                        thumbnail: response.data.thumbnail_url || ''
+                        title: response.data.title || 'TikTok Video',
+                        description: author ? `작성자: ${author}` : '',
+                        thumbnail: response.data.thumbnail_url || '',
+                        author: author
                     };
                 }
             } catch (e) {
                 console.log('TikTok oEmbed failed:', e.message);
+            }
+        }
+
+        // TikTok 채널
+        if (platform === 'tiktok' && !url.includes('/video/')) {
+            try {
+                const response = await axios.get(url, {
+                    headers: {
+                        'User-Agent': 'facebookexternalhit/1.1',
+                        'Accept': 'text/html',
+                        'Accept-Language': 'ko-KR,ko;q=0.9'
+                    },
+                    timeout: 10000,
+                    maxRedirects: 5
+                });
+                const $ = cheerio.load(response.data);
+
+                const title = $('meta[property="og:title"]').attr('content') ||
+                             $('title').text() || 'TikTok';
+                const description = $('meta[property="og:description"]').attr('content') || '';
+                const thumbnail = $('meta[property="og:image"]').attr('content') || '';
+
+                return { title, description, thumbnail, author: authorHandle };
+            } catch {
+                return {
+                    title: authorHandle || 'TikTok Channel',
+                    description: '',
+                    thumbnail: '',
+                    author: authorHandle
+                };
+            }
+        }
+
+        // Instagram - OG 태그 파싱
+        if (platform === 'instagram') {
+            try {
+                const response = await axios.get(url, {
+                    headers: {
+                        'User-Agent': 'facebookexternalhit/1.1',
+                        'Accept': 'text/html',
+                        'Accept-Language': 'ko-KR,ko;q=0.9'
+                    },
+                    timeout: 10000,
+                    maxRedirects: 5
+                });
+                const $ = cheerio.load(response.data);
+
+                const title = $('meta[property="og:title"]').attr('content') ||
+                             $('meta[name="twitter:title"]').attr('content') ||
+                             $('title').text() || 'Instagram';
+                const description = $('meta[property="og:description"]').attr('content') ||
+                                   $('meta[name="description"]').attr('content') || '';
+                const thumbnail = $('meta[property="og:image"]').attr('content') ||
+                                 $('meta[name="twitter:image"]').attr('content') || '';
+
+                return { title, description, thumbnail, author: authorHandle };
+            } catch {
+                return {
+                    title: authorHandle || 'Instagram',
+                    description: '',
+                    thumbnail: '',
+                    author: authorHandle
+                };
             }
         }
 
@@ -137,11 +253,13 @@ async function fetchOgTags(url, platform) {
             description: $('meta[property="og:description"]').attr('content') ||
                         $('meta[name="description"]').attr('content') || '',
             thumbnail: $('meta[property="og:image"]').attr('content') ||
-                      $('meta[name="twitter:image"]').attr('content') || ''
+                      $('meta[name="twitter:image"]').attr('content') || '',
+            author: authorHandle
         };
     } catch (error) {
         console.error('OG parsing failed:', error.message);
-        return { title: url, description: '', thumbnail: '' };
+        const authorHandle = extractAuthorHandle(url);
+        return { title: authorHandle || url, description: '', thumbnail: '', author: authorHandle };
     }
 }
 
@@ -168,7 +286,7 @@ export default async function handler(req, res) {
 
     try {
         const urlInfo = analyzeUrl(url);
-        const ogData = await fetchOgTags(url, urlInfo.platform);
+        const ogData = await fetchOgTags(url, urlInfo.platform, urlInfo.type);
 
         return res.status(200).json({
             platform: urlInfo.platform,
@@ -177,6 +295,7 @@ export default async function handler(req, res) {
             title: cleanTitle(ogData.title, urlInfo.platform),
             thumbnail: ogData.thumbnail,
             description: ogData.description,
+            author: ogData.author || null,
             url: url
         });
     } catch (error) {

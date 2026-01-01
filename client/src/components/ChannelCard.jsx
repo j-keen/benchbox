@@ -9,7 +9,10 @@ const ChannelCard = ({ channel, onClick, isSelected, onSelect, selectionMode, on
     const platformColor = getPlatformColor(channel.platform);
 
     // title에서 핸들(@username) 추출
-    const parseHandle = (title, url) => {
+    const parseHandle = (title, url, author) => {
+        // author 필드가 있으면 사용
+        if (author) return author.startsWith('@') ? author : `@${author}`;
+
         // title에서 (@username) 패턴 찾기
         const titleMatch = title?.match(/\(@([^)]+)\)/);
         if (titleMatch) return `@${titleMatch[1]}`;
@@ -28,14 +31,14 @@ const ChannelCard = ({ channel, onClick, isSelected, onSelect, selectionMode, on
         let followers = null;
         let posts = null;
 
-        // "팔로워 100K" 또는 "100K Followers" 패턴
-        const followersMatch = description.match(/팔로워\s*([\d,.]+[KkMm]?)명?|(\d[\d,.]*[KkMm]?)\s*[Ff]ollowers?/i);
+        // "팔로워 100K" 또는 "100K Followers" 또는 "구독자 100K" 패턴
+        const followersMatch = description.match(/(?:팔로워|구독자)\s*([\d,.]+[KkMm만억]?)명?|(\d[\d,.]*[KkMm]?)\s*(?:[Ff]ollowers?|[Ss]ubscribers?)/i);
         if (followersMatch) {
             followers = followersMatch[1] || followersMatch[2];
         }
 
-        // "게시물 52개" 또는 "52 posts" 패턴
-        const postsMatch = description.match(/게시물\s*([\d,]+)개?|(\d[\d,]*)\s*[Pp]osts?/i);
+        // "게시물 52개" 또는 "52 posts" 또는 "동영상 100개" 패턴
+        const postsMatch = description.match(/(?:게시물|동영상)\s*([\d,]+)개?|(\d[\d,]*)\s*(?:[Pp]osts?|[Vv]ideos?)/i);
         if (postsMatch) {
             posts = postsMatch[1] || postsMatch[2];
         }
@@ -44,13 +47,17 @@ const ChannelCard = ({ channel, onClick, isSelected, onSelect, selectionMode, on
         return { followers, posts };
     };
 
-    // title에서 이름만 추출 ((@username) 제거)
+    // title에서 이름만 추출 ((@username) 제거, 님 제거)
     const cleanChannelName = (title) => {
         if (!title) return 'Untitled';
-        return title.replace(/\s*\(@[^)]+\)\s*$/, '').replace(/\s*님\s*$/, '').trim() || title;
+        return title
+            .replace(/\s*\(@[^)]+\)\s*$/, '')  // (@username) 제거
+            .replace(/\s*님\s*$/, '')           // 님 제거
+            .replace(/^@/, '')                  // 앞의 @ 제거
+            .trim() || title;
     };
 
-    const handle = parseHandle(channel.title, channel.url);
+    const handle = parseHandle(channel.title, channel.url, channel.author);
     const channelStats = parseChannelStats(channel.description);
     const displayName = cleanChannelName(channel.title);
 
