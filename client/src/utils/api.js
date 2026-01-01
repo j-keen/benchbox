@@ -632,7 +632,7 @@ export const tagsApi = {
     }
 };
 
-// YouTube 비디오 ID 추출
+// YouTube 비디오 ID 추출 (클라이언트에서 직접 처리)
 function extractYouTubeVideoId(url) {
     // youtube.com/watch?v=VIDEO_ID
     let match = url.match(/youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/);
