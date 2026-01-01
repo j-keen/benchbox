@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { videosApi, tagsApi } from '../utils/api';
+import { videosApi, tagsApi, parseUrlApi } from '../utils/api';
 import { useToast } from '../contexts/ToastContext';
 import VideoCard from '../components/VideoCard';
 import VideoModal from '../components/VideoModal';
@@ -61,7 +61,14 @@ const AllVideosPage = () => {
     };
 
     const handleQuickAdd = async (url) => {
-        const response = await videosApi.create({ url });
+        const parseResult = await parseUrlApi.parse(url);
+        const parsed = parseResult.data;
+        const response = await videosApi.create({
+            url,
+            title: parsed.title,
+            thumbnail: parsed.thumbnail,
+            description: parsed.description
+        });
         setVideos(prev => [response.data, ...prev]);
     };
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { foldersApi, channelsApi, videosApi } from '../utils/api';
+import { foldersApi, channelsApi, videosApi, parseUrlApi } from '../utils/api';
 import { useToast } from '../contexts/ToastContext';
 import { useGlobalPaste } from '../hooks/useKeyboardShortcuts';
 import NavigationTabs from '../components/NavigationTabs';
@@ -73,7 +73,14 @@ const FolderDetail = () => {
 
     // 빠른 채널 URL 등록 (이 폴더에 추가)
     const handleQuickChannelAdd = async (url) => {
-        const response = await channelsApi.create({ url });
+        const parseResult = await parseUrlApi.parse(url);
+        const parsed = parseResult.data;
+        const response = await channelsApi.create({
+            url,
+            title: parsed.title,
+            thumbnail: parsed.thumbnail,
+            description: parsed.description
+        });
         const newChannel = response.data;
 
         // 새 채널을 이 폴더로 이동
@@ -83,8 +90,16 @@ const FolderDetail = () => {
 
     // 빠른 영상 URL 등록 (폴더에 직접 저장)
     const handleQuickVideoAdd = async (url) => {
+        const parseResult = await parseUrlApi.parse(url);
+        const parsed = parseResult.data;
         // 폴더에 직접 영상 저장 (folder_id만 설정, channel_id는 null)
-        await videosApi.create({ url, folder_id: parseInt(id) });
+        await videosApi.create({
+            url,
+            folder_id: parseInt(id),
+            title: parsed.title,
+            thumbnail: parsed.thumbnail,
+            description: parsed.description
+        });
         await loadData();
     };
 
@@ -191,8 +206,16 @@ const FolderDetail = () => {
     // 전역 URL 붙여넣기 처리 (이 폴더에 영상으로 저장)
     const handleGlobalPaste = useCallback(async (url) => {
         try {
+            const parseResult = await parseUrlApi.parse(url);
+            const parsed = parseResult.data;
             // 폴더 페이지에서는 영상으로 저장 (folder_id 포함)
-            await videosApi.create({ url, folder_id: parseInt(id) });
+            await videosApi.create({
+                url,
+                folder_id: parseInt(id),
+                title: parsed.title,
+                thumbnail: parsed.thumbnail,
+                description: parsed.description
+            });
             await loadData();
             toast.success('영상이 등록되었습니다.');
         } catch (error) {

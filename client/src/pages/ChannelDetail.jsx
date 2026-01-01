@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { videosApi, channelsApi, tagsApi, foldersApi } from '../utils/api';
+import { videosApi, channelsApi, tagsApi, foldersApi, parseUrlApi } from '../utils/api';
 import { useToast } from '../contexts/ToastContext';
 import { useGlobalPaste } from '../hooks/useKeyboardShortcuts';
 import VideoCard from '../components/VideoCard';
@@ -88,13 +88,24 @@ const ChannelDetail = () => {
     // URL 저장 처리
     const handleSaveUrl = async (data) => {
         try {
+            const parseResult = await parseUrlApi.parse(data.url);
+            const parsed = parseResult.data;
+
             if (data.isChannel) {
-                await channelsApi.create({ url: data.url });
+                await channelsApi.create({
+                    url: data.url,
+                    title: parsed.title,
+                    thumbnail: parsed.thumbnail,
+                    description: parsed.description
+                });
                 navigate('/');
             } else {
                 const response = await videosApi.create({
                     url: data.url,
-                    channel_id: data.channel_id || parseInt(id)
+                    channel_id: data.channel_id || parseInt(id),
+                    title: parsed.title,
+                    thumbnail: parsed.thumbnail,
+                    description: parsed.description
                 });
 
                 if (data.channel_id === parseInt(id) || !data.channel_id) {
@@ -235,8 +246,16 @@ const ChannelDetail = () => {
     // 전역 URL 붙여넣기 처리 (이 채널에 영상으로 저장)
     const handleGlobalPaste = useCallback(async (url) => {
         try {
+            const parseResult = await parseUrlApi.parse(url);
+            const parsed = parseResult.data;
             // 채널 페이지에서는 이 채널에 영상으로 저장
-            const response = await videosApi.create({ url, channel_id: parseInt(id) });
+            const response = await videosApi.create({
+                url,
+                channel_id: parseInt(id),
+                title: parsed.title,
+                thumbnail: parsed.thumbnail,
+                description: parsed.description
+            });
             setVideos(prev => [response.data, ...prev]);
             toast.success('영상이 등록되었습니다.');
         } catch (error) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { channelsApi, foldersApi } from '../utils/api';
+import { channelsApi, foldersApi, parseUrlApi } from '../utils/api';
 import { useToast } from '../contexts/ToastContext';
 import ChannelCard, { AddChannelCard } from '../components/ChannelCard';
 import QuickUrlModal from '../components/QuickUrlModal';
@@ -63,7 +63,14 @@ const AllChannelsPage = () => {
     };
 
     const handleQuickAdd = async (url) => {
-        const response = await channelsApi.create({ url });
+        const parseResult = await parseUrlApi.parse(url);
+        const parsed = parseResult.data;
+        const response = await channelsApi.create({
+            url,
+            title: parsed.title,
+            thumbnail: parsed.thumbnail,
+            description: parsed.description
+        });
         setChannels(prev => [response.data, ...prev]);
     };
 
