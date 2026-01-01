@@ -120,6 +120,19 @@ const AllChannelsPage = () => {
         }
     };
 
+    const handleUpdateThumbnail = async (channelId, thumbnailUrl) => {
+        try {
+            await channelsApi.update(channelId, { thumbnail: thumbnailUrl });
+            setChannels(prev => prev.map(c =>
+                c.id === channelId ? { ...c, thumbnail: thumbnailUrl } : c
+            ));
+            toast.success('썸네일이 수정되었습니다.');
+        } catch (error) {
+            console.error('썸네일 수정 오류:', error);
+            toast.error('썸네일 수정 중 오류가 발생했습니다.');
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50">
             {/* 네비게이션 탭 */}
@@ -247,6 +260,7 @@ const AllChannelsPage = () => {
                                 isSelected={selectedChannels.has(channel.id)}
                                 onSelect={handleChannelSelect}
                                 selectionMode={selectionMode}
+                                onUpdateThumbnail={handleUpdateThumbnail}
                             />
                         ))}
                     </div>

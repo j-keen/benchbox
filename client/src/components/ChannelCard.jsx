@@ -1,12 +1,167 @@
 import React, { useState, useRef, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import { getPlatformIcon, getPlatformColor } from '../utils/platformIcons';
+import { storageApi } from '../utils/api';
 
-const ChannelCard = ({ channel, onClick, isSelected, onSelect, selectionMode, onVideoDrop, draggable = false }) => {
+// 썸네일 수정 모달 컴포넌트 (Portal로 렌더링)
+const ThumbnailEditModal = ({ channel, thumbnailUrl, setThumbnailUrl, uploading, setUploading, fileInputRef, onSave, onClose }) => {
+    const handleFileUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            alert('이미지 파일만 업로드할 수 있습니다.');
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            alert('파일 크기는 5MB 이하여야 합니다.');
+            return;
+        }
+
+        try {
+            setUploading(true);
+            const publicUrl = await storageApi.uploadImage(file, 'channel-thumbnails');
+            setThumbnailUrl(publicUrl);
+        } catch (error) {
+            console.error('업로드 오류:', error);
+            alert('이미지 업로드에 실패했습니다.');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    return ReactDOM.createPortal(
+        <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4"
+            onClick={onClose}
+        >
+            <div
+                className="bg-white rounded-xl w-full max-w-xs shadow-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* 헤더 */}
+                <div className="flex items-center justify-between px-4 py-3 border-b">
+                    <h3 className="font-medium text-gray-900">썸네일 수정</h3>
+                    <button
+                        onClick={onClose}
+                        className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* 콘텐츠 */}
+                <div className="p-4">
+                    {/* 이미지 업로드 영역 */}
+                    <div
+                        className="aspect-video bg-gray-100 rounded-lg overflow-hidden relative cursor-pointer group mb-4"
+                        onClick={() => fileInputRef.current?.click()}
+                    >
+                        {uploading ? (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                        ) : thumbnailUrl ? (
+                            <>
+                                <img
+                                    src={thumbnailUrl}
+                                    alt="미리보기"
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect fill="%23e5e7eb" width="1" height="1"/></svg>';
+                                    }}
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <span className="text-white text-sm font-medium">클릭하여 변경</span>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 hover:text-primary-500 transition-colors">
+                                <svg className="w-10 h-10 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <span className="text-sm">이미지 업로드</span>
+                            </div>
+                        )}
+                    </div>
+
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                    />
+
+                    {/* 구분선 */}
+                    <div className="flex items-center gap-2 mb-3">
+                        <div className="flex-1 h-px bg-gray-200"></div>
+                        <span className="text-xs text-gray-400">또는 URL 입력</span>
+                        <div className="flex-1 h-px bg-gray-200"></div>
+                    </div>
+
+                    <input
+                        type="text"
+                        value={thumbnailUrl}
+                        onChange={(e) => setThumbnailUrl(e.target.value)}
+                        placeholder="이미지 URL 붙여넣기"
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                </div>
+
+                {/* 버튼 영역 */}
+                <div className="flex gap-2 p-4 pt-0">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 px-4 py-3 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                        취소
+                    </button>
+                    <button
+                        onClick={onSave}
+                        className="flex-1 px-4 py-3 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-600 transition-colors"
+                    >
+                        저장
+                    </button>
+                </div>
+            </div>
+        </div>,
+        document.body
+    );
+};
+
+const ChannelCard = ({ channel, onClick, isSelected, onSelect, selectionMode, onVideoDrop, draggable = false, onUpdateThumbnail }) => {
     const [isHovered, setIsHovered] = useState(false);
     const [isDragOver, setIsDragOver] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
+    const [showThumbnailEdit, setShowThumbnailEdit] = useState(false);
+    const [thumbnailUrl, setThumbnailUrl] = useState('');
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef(null);
     const PlatformIcon = getPlatformIcon(channel.platform);
     const platformColor = getPlatformColor(channel.platform);
+
+    const openThumbnailEdit = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        setThumbnailUrl(channel.thumbnail || '');
+        setShowThumbnailEdit(true);
+    };
+
+    const closeThumbnailEdit = () => {
+        setShowThumbnailEdit(false);
+    };
+
+    const saveThumbnail = () => {
+        if (onUpdateThumbnail) {
+            onUpdateThumbnail(channel.id, thumbnailUrl);
+        }
+        setShowThumbnailEdit(false);
+    };
 
     // title에서 핸들(@username) 추출
     const parseHandle = (title, url, author) => {
@@ -234,6 +389,19 @@ const ChannelCard = ({ channel, onClick, isSelected, onSelect, selectionMode, on
                     </div>
                 )}
 
+                {/* 썸네일 수정 버튼 (호버 시 또는 모달 열려있을 때) */}
+                {onUpdateThumbnail && (isHovered || showThumbnailEdit) && !selectionMode && (
+                    <button
+                        onClick={openThumbnailEdit}
+                        className="absolute bottom-2 right-2 w-8 h-8 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center cursor-pointer transition-all"
+                        title="썸네일 수정"
+                    >
+                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                    </button>
+                )}
+
                 {/* 우측 상단: 플랫폼 아이콘 + 영상 수 */}
                 <div className="absolute top-2 right-2 flex items-center gap-1">
                     {channel.video_count > 0 && (
@@ -274,6 +442,20 @@ const ChannelCard = ({ channel, onClick, isSelected, onSelect, selectionMode, on
                     </div>
                 )}
             </div>
+
+            {/* 썸네일 수정 모달 (Portal로 body에 렌더링) */}
+            {showThumbnailEdit && (
+                <ThumbnailEditModal
+                    channel={channel}
+                    thumbnailUrl={thumbnailUrl}
+                    setThumbnailUrl={setThumbnailUrl}
+                    uploading={uploading}
+                    setUploading={setUploading}
+                    fileInputRef={fileInputRef}
+                    onSave={saveThumbnail}
+                    onClose={closeThumbnailEdit}
+                />
+            )}
         </div>
     );
 };

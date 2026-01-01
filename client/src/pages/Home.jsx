@@ -446,6 +446,20 @@ const Home = () => {
         }
     };
 
+    // 채널 썸네일 수정
+    const handleUpdateThumbnail = async (channelId, thumbnailUrl) => {
+        try {
+            await channelsApi.update(channelId, { thumbnail: thumbnailUrl });
+            setChannels(prev => prev.map(c =>
+                c.id === channelId ? { ...c, thumbnail: thumbnailUrl } : c
+            ));
+            toast.success('썸네일이 수정되었습니다.');
+        } catch (error) {
+            console.error('썸네일 수정 오류:', error);
+            toast.error('썸네일 수정 중 오류가 발생했습니다.');
+        }
+    };
+
     // 폴더 저장
     const handleSaveFolder = async (folderData) => {
         try {
@@ -798,6 +812,7 @@ const Home = () => {
                                 selectionMode={selectionMode}
                                 onVideoDrop={handleVideoDrop}
                                 draggable={activeFolder === null}
+                                onUpdateThumbnail={handleUpdateThumbnail}
                             />
                         ))}
 
