@@ -111,23 +111,30 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
     const parseStats = (description) => {
         if (!description) return null;
 
+        let views = null;
         let likes = null;
         let comments = null;
 
-        // "좋아요 570.5K개" 또는 "1,431 likes" 패턴
-        const likesMatch = description.match(/좋아요\s*([\d,.]+[KkMm]?)개|(\d[\d,]*)\s*likes?/i);
+        // "조회수 10.5만" 또는 "10.5K views" 패턴 (YouTube)
+        const viewsMatch = description.match(/조회수\s*([\d,.]+[KkMm만억]?)|(\d[\d,.]*[KkMm]?)\s*views?/i);
+        if (viewsMatch) {
+            views = viewsMatch[1] || viewsMatch[2];
+        }
+
+        // "좋아요 1.5만개" 또는 "570.5K개" 또는 "1,431 likes" 패턴
+        const likesMatch = description.match(/좋아요\s*([\d,.]+[KkMm만억]?)개?|(\d[\d,]*)\s*likes?/i);
         if (likesMatch) {
             likes = likesMatch[1] || likesMatch[2];
         }
 
-        // "댓글 7606개" 또는 "8 comments" 패턴
-        const commentsMatch = description.match(/댓글\s*([\d,.]+[KkMm]?)개|(\d[\d,]*)\s*comments?/i);
+        // "댓글 500개" 또는 "7606개" 또는 "8 comments" 패턴
+        const commentsMatch = description.match(/댓글\s*([\d,.]+[KkMm만억]?)개?|(\d[\d,]*)\s*comments?/i);
         if (commentsMatch) {
             comments = commentsMatch[1] || commentsMatch[2];
         }
 
-        if (!likes && !comments) return null;
-        return { likes, comments };
+        if (!views && !likes && !comments) return null;
+        return { views, likes, comments };
     };
 
     // description에서 작성자 추출 (author 필드가 없을 경우)
@@ -250,9 +257,15 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
                     </div>
                 )}
 
-                {/* 통계 정보 (좋아요, 댓글) */}
+                {/* 통계 정보 (조회수, 좋아요, 댓글) */}
                 {stats && (
-                    <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
+                    <div className="mt-1 flex items-center gap-2 text-xs text-gray-400 flex-wrap">
+                        {stats.views && (
+                            <span className="flex items-center gap-1">
+                                <span>👁️</span>
+                                <span>{stats.views}</span>
+                            </span>
+                        )}
                         {stats.likes && (
                             <span className="flex items-center gap-1">
                                 <span>❤️</span>
