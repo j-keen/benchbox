@@ -1,3 +1,7 @@
+---
+description: Vercel에 배포
+---
+
 # 배포
 
 dev 브랜치의 코드를 main에 병합하여 Vercel에 배포합니다.

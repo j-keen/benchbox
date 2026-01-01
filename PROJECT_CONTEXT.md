@@ -386,6 +386,15 @@ vercel --prod
 
 ## 최근 변경 이력
 
+### 2026-01-01 (오후)
+
+- **Git 브랜치 워크플로우 설정**: `dev` 브랜치 생성
+  - `dev`: 작업용 (GitHub 동기화, 배포 안됨)
+  - `main`: 배포용 (Vercel 자동 배포)
+- **커스텀 Claude 명령어 추가**: `.claude/commands/`
+  - `/save`: 작업 저장 및 GitHub 동기화 (배포 안함)
+  - `/deploy`: main에 병합하여 Vercel 배포
+
 ### 2026-01-01
 
 - **⭐ Vercel Serverless Function 추가**: `client/api/parse-url.js` 생성
