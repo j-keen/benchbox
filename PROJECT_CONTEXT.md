@@ -15,6 +15,9 @@ BenchBox는 콘텐츠 크리에이터가 영상 벤치마킹 자료를 효율적
 ```
 benchbox/
 ├── client/                          # React 프론트엔드
+│   ├── api/
+│   │   └── parse-url.js             # ⭐ Vercel Serverless Function (OG 파싱)
+│   │
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── ChannelCard.jsx      # 채널 카드 (롱프레스 선택)
@@ -43,11 +46,12 @@ benchbox/
 │   │   │   └── useLongPress.js      # 롱프레스 훅
 │   │   │
 │   │   └── utils/
-│   │       ├── api.js               # Axios API 클라이언트
+│   │       ├── api.js               # ⭐ Supabase API + parseUrlApi
 │   │       └── platformIcons.jsx    # 플랫폼 아이콘
 │   │
 │   ├── .env                         # 환경변수 (gitignore)
 │   ├── .env.example                 # 환경변수 예시
+│   ├── vercel.json                  # ⭐ Vercel 설정 (serverless function)
 │   └── vite.config.js
 │
 ├── server/                          # Express 백엔드
@@ -165,6 +169,107 @@ CREATE TABLE channel_tags (
 
 ---
 
+## ⭐ 핵심 기능: OG 태그 파싱 (URL 정보 추출)
+
+**중요**: 이 기능은 URL 붙여넣기 시 제목/썸네일/설명을 자동으로 가져오는 핵심 기능입니다.
+카카오톡에서 링크 공유 시 미리보기가 뜨는 것과 같은 원리입니다.
+
+### 동작 흐름
+
+```
+사용자 URL 입력
+       ↓
+parseUrlApi.parse(url) 호출
+       ↓
+┌─────────────────────────────────────┐
+│ 1. Vercel Serverless Function 호출  │
+│    POST /api/parse-url              │
+│    (서버 사이드에서 OG 태그 파싱)    │
+└─────────────────────────────────────┘
+       ↓ 실패 시
+┌─────────────────────────────────────┐
+│ 2. 클라이언트 폴백                   │
+│    (YouTube만 가능 - 썸네일 URL 직접 생성) │
+└─────────────────────────────────────┘
+       ↓
+{ platform, type, title, thumbnail, description } 반환
+       ↓
+videosApi.create() 또는 channelsApi.create()로 DB 저장
+```
+
+### 파일별 역할
+
+| 파일 | 역할 |
+|------|------|
+| `client/api/parse-url.js` | **Vercel Serverless Function** - 배포 시 서버 역할 |
+| `client/src/utils/api.js` | `parseUrlApi` 객체 - 서버 호출 + 폴백 로직 |
+| `client/vercel.json` | Vercel 설정 - `/api/*` 라우팅 |
+| `server/routes/parseUrl.js` | 로컬 개발용 서버 API |
+| `server/services/ogParser.js` | 로컬 개발용 OG 파싱 로직 |
+
+### Serverless Function 상세 (`client/api/parse-url.js`)
+
+```javascript
+// 플랫폼별 처리
+- YouTube: 비디오 ID 추출 → 썸네일 직접 생성 + OG 태그로 제목
+- TikTok: oEmbed API 사용 (https://www.tiktok.com/oembed?url=...)
+- Instagram: OG 태그 파싱
+- 기타: 일반 OG 태그 파싱
+
+// YouTube 썸네일 URL 패턴
+https://img.youtube.com/vi/${videoId}/maxresdefault.jpg
+```
+
+### 의존성
+
+**client/package.json에 필수**:
+```json
+{
+  "dependencies": {
+    "axios": "^1.6.2",
+    "cheerio": "^1.0.0-rc.12"  // HTML 파싱용
+  }
+}
+```
+
+### 주의사항
+
+1. **모든 페이지에서 parseUrlApi 사용 필수**
+   - Home.jsx
+   - FolderDetail.jsx
+   - ChannelDetail.jsx
+   - AllChannelsPage.jsx
+   - AllVideosPage.jsx
+
+   각 페이지의 URL 저장 함수에서 반드시 `parseUrlApi.parse(url)` 호출 후 결과를 DB에 저장해야 함
+
+2. **환경변수 (Vercel)**
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+
+   Vercel 대시보드 → Settings → Environment Variables에 설정 필요
+   (.env 파일은 gitignore되어 배포 시 포함 안됨)
+
+3. **vercel.json 필수**
+   ```json
+   {
+     "rewrites": [
+       { "source": "/api/:path*", "destination": "/api/:path*" },
+       { "source": "/(.*)", "destination": "/" }
+     ],
+     "functions": {
+       "api/parse-url.js": { "maxDuration": 30 }
+     }
+   }
+   ```
+
+4. **CORS 문제**
+   - 클라이언트에서 직접 외부 사이트 OG 태그 파싱 불가 (CORS 차단)
+   - 반드시 서버 사이드(Serverless Function)에서 처리해야 함
+   - 이것이 `client/api/parse-url.js`가 필요한 이유
+
+---
+
 ## 진행 중 / 개선 예정
 
 ### 우선순위 높음
@@ -259,12 +364,15 @@ vercel --prod
 | 기능 | 파일 |
 |------|------|
 | API 클라이언트 | `client/src/utils/api.js` |
-| URL 파싱 | `server/services/urlParser.js` |
+| **OG 파싱 (배포)** | `client/api/parse-url.js` ⭐ |
+| **OG 파싱 (로컬)** | `server/services/ogParser.js` |
+| **Vercel 설정** | `client/vercel.json` ⭐ |
+| URL 분석 | `server/services/urlAnalyzer.js` |
 | 롱프레스 선택 | `client/src/components/VideoCard.jsx` (handleTouchStart/End) |
 | 영상 모달 | `client/src/components/VideoModal.jsx` |
 | 폴더 상세 | `client/src/pages/FolderDetail.jsx` |
 | 채널 상세 | `client/src/pages/ChannelDetail.jsx` |
-| Supabase 연결 | `server/services/supabase.js` |
+| Supabase 연결 | `client/src/utils/api.js` (supabase 객체) |
 
 ---
 
@@ -277,6 +385,18 @@ vercel --prod
 ---
 
 ## 최근 변경 이력
+
+### 2026-01-01
+
+- **⭐ Vercel Serverless Function 추가**: `client/api/parse-url.js` 생성
+  - 배포 환경에서 OG 태그 파싱 가능하게 함
+  - YouTube, TikTok(oEmbed), Instagram 지원
+  - cheerio로 HTML 파싱
+- **⭐ vercel.json 설정 추가**: API 라우팅 및 함수 설정
+- **⭐ parseUrlApi 개선**: 서버 API 우선 호출 → 실패 시 클라이언트 폴백
+- **모든 페이지에 parseUrlApi 적용**: FolderDetail, ChannelDetail, AllChannelsPage, AllVideosPage
+- **406 에러 수정**: URL 특수문자로 인한 Supabase 쿼리 에러 → `.maybeSingle()` 사용
+- **cheerio 의존성 추가**: client/package.json에 추가
 
 ### 2025-01-01
 
