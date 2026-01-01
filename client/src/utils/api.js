@@ -632,36 +632,58 @@ export const tagsApi = {
     }
 };
 
-// URL 파싱 API (서버에서 OG 태그 파싱)
-const API_BASE = 'http://localhost:3001/api';
+// YouTube 비디오 ID 추출
+function extractYouTubeVideoId(url) {
+    // youtube.com/watch?v=VIDEO_ID
+    let match = url.match(/youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/);
+    if (match) return match[1];
 
+    // youtu.be/VIDEO_ID
+    match = url.match(/youtu\.be\/([a-zA-Z0-9_-]+)/);
+    if (match) return match[1];
+
+    // youtube.com/shorts/VIDEO_ID
+    match = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]+)/);
+    if (match) return match[1];
+
+    return null;
+}
+
+// URL 파싱 API (클라이언트에서 직접 처리, 서버 불필요)
 export const parseUrlApi = {
     parse: async (url) => {
-        try {
-            const response = await fetch(`${API_BASE}/parse-url`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url })
-            });
-            if (!response.ok) throw new Error('파싱 실패');
-            const data = await response.json();
-            return { data };
-        } catch (error) {
-            // 서버 파싱 실패 시 로컬 fallback
-            console.log('서버 파싱 실패, 로컬 처리:', error.message);
-            const urlInfo = analyzeUrl(url);
-            return {
-                data: {
-                    platform: urlInfo.platform,
-                    type: urlInfo.type,
-                    videoType: urlInfo.videoType,
-                    url: urlInfo.url,
-                    title: url,
-                    thumbnail: '',
-                    description: ''
-                }
-            };
+        const urlInfo = analyzeUrl(url);
+
+        // YouTube인 경우 썸네일 직접 생성
+        if (urlInfo.platform === 'youtube') {
+            const videoId = extractYouTubeVideoId(url);
+            if (videoId) {
+                return {
+                    data: {
+                        platform: urlInfo.platform,
+                        type: urlInfo.type,
+                        videoType: urlInfo.videoType,
+                        url: urlInfo.url,
+                        title: url,
+                        thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+                        description: ''
+                    }
+                };
+            }
         }
+
+        // 다른 플랫폼은 기본값 반환
+        return {
+            data: {
+                platform: urlInfo.platform,
+                type: urlInfo.type,
+                videoType: urlInfo.videoType,
+                url: urlInfo.url,
+                title: url,
+                thumbnail: '',
+                description: ''
+            }
+        };
     }
 };
 
