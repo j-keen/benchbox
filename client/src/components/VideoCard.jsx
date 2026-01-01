@@ -107,6 +107,31 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
         return date.toLocaleDateString('ko-KR');
     };
 
+    // description에서 통계 정보 파싱
+    const parseStats = (description) => {
+        if (!description) return null;
+
+        let likes = null;
+        let comments = null;
+
+        // "좋아요 570.5K개" 또는 "1,431 likes" 패턴
+        const likesMatch = description.match(/좋아요\s*([\d,.]+[KkMm]?)개|(\d[\d,]*)\s*likes?/i);
+        if (likesMatch) {
+            likes = likesMatch[1] || likesMatch[2];
+        }
+
+        // "댓글 7606개" 또는 "8 comments" 패턴
+        const commentsMatch = description.match(/댓글\s*([\d,.]+[KkMm]?)개|(\d[\d,]*)\s*comments?/i);
+        if (commentsMatch) {
+            comments = commentsMatch[1] || commentsMatch[2];
+        }
+
+        if (!likes && !comments) return null;
+        return { likes, comments };
+    };
+
+    const stats = parseStats(video.description);
+
     const handleCheckClick = (e) => {
         e.stopPropagation();
         if (onSelect) {
@@ -209,11 +234,22 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
                     {video.title || 'Untitled'}
                 </h3>
 
-                {/* 설명 */}
-                {video.description && (
-                    <p className="mt-1 text-xs text-gray-500 line-clamp-2">
-                        {video.description}
-                    </p>
+                {/* 통계 정보 (좋아요, 댓글) */}
+                {stats && (
+                    <div className="mt-1 flex items-center gap-3 text-xs text-gray-500">
+                        {stats.likes && (
+                            <span className="flex items-center gap-1">
+                                <span>❤️</span>
+                                <span>{stats.likes}</span>
+                            </span>
+                        )}
+                        {stats.comments && (
+                            <span className="flex items-center gap-1">
+                                <span>💬</span>
+                                <span>{stats.comments}</span>
+                            </span>
+                        )}
+                    </div>
                 )}
 
                 {/* 태그 */}

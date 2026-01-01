@@ -8,6 +8,52 @@ const ChannelCard = ({ channel, onClick, isSelected, onSelect, selectionMode, on
     const PlatformIcon = getPlatformIcon(channel.platform);
     const platformColor = getPlatformColor(channel.platform);
 
+    // title에서 핸들(@username) 추출
+    const parseHandle = (title, url) => {
+        // title에서 (@username) 패턴 찾기
+        const titleMatch = title?.match(/\(@([^)]+)\)/);
+        if (titleMatch) return `@${titleMatch[1]}`;
+
+        // URL에서 추출
+        const urlMatch = url?.match(/(?:youtube\.com\/@|tiktok\.com\/@|instagram\.com\/)([^/?]+)/);
+        if (urlMatch) return `@${urlMatch[1]}`;
+
+        return null;
+    };
+
+    // description에서 팔로워/게시물 정보 파싱
+    const parseChannelStats = (description) => {
+        if (!description) return null;
+
+        let followers = null;
+        let posts = null;
+
+        // "팔로워 100K" 또는 "100K Followers" 패턴
+        const followersMatch = description.match(/팔로워\s*([\d,.]+[KkMm]?)명?|(\d[\d,.]*[KkMm]?)\s*[Ff]ollowers?/i);
+        if (followersMatch) {
+            followers = followersMatch[1] || followersMatch[2];
+        }
+
+        // "게시물 52개" 또는 "52 posts" 패턴
+        const postsMatch = description.match(/게시물\s*([\d,]+)개?|(\d[\d,]*)\s*[Pp]osts?/i);
+        if (postsMatch) {
+            posts = postsMatch[1] || postsMatch[2];
+        }
+
+        if (!followers && !posts) return null;
+        return { followers, posts };
+    };
+
+    // title에서 이름만 추출 ((@username) 제거)
+    const cleanChannelName = (title) => {
+        if (!title) return 'Untitled';
+        return title.replace(/\s*\(@[^)]+\)\s*$/, '').replace(/\s*님\s*$/, '').trim() || title;
+    };
+
+    const handle = parseHandle(channel.title, channel.url);
+    const channelStats = parseChannelStats(channel.description);
+    const displayName = cleanChannelName(channel.title);
+
     // Long press state
     const longPressTimeout = useRef(null);
     const touchMoved = useRef(false);
@@ -197,11 +243,29 @@ const ChannelCard = ({ channel, onClick, isSelected, onSelect, selectionMode, on
             {/* 정보 */}
             <div className="p-2">
                 <h3 className="font-medium text-gray-900 text-sm truncate">
-                    {channel.title || 'Untitled'}
+                    {displayName}
                 </h3>
-                <div className="mt-1 text-xs text-gray-500 line-clamp-2 leading-4 min-h-[32px]">
-                    {channel.description || '영상을 추가해보세요'}
-                </div>
+                {/* 핸들 (@username) */}
+                {handle && (
+                    <div className="text-xs text-gray-400 truncate">
+                        {handle}
+                    </div>
+                )}
+                {/* 팔로워/게시물 통계 */}
+                {channelStats ? (
+                    <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
+                        {channelStats.followers && (
+                            <span>👥 {channelStats.followers}</span>
+                        )}
+                        {channelStats.posts && (
+                            <span>📹 {channelStats.posts}</span>
+                        )}
+                    </div>
+                ) : (
+                    <div className="mt-1 text-xs text-gray-400">
+                        영상을 추가해보세요
+                    </div>
+                )}
             </div>
         </div>
     );
