@@ -1,6 +1,19 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 
+// YouTube API 키
+const YOUTUBE_API_KEY = 'AIzaSyBP72SA8upFcS5Buykjn5oSfvfWnvDosAw';
+
+// 숫자 포맷팅 (1000 -> 1K, 1000000 -> 1M)
+function formatCount(num) {
+    if (!num) return null;
+    const n = parseInt(num);
+    if (n >= 100000000) return `${(n / 100000000).toFixed(1)}억`;
+    if (n >= 10000) return `${(n / 10000).toFixed(1)}만`;
+    if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+    return n.toString();
+}
+
 // URL 분석
 function analyzeUrl(url) {
     const normalizedUrl = url.trim();
@@ -75,6 +88,19 @@ function extractYouTubeVideoId(url) {
     return null;
 }
 
+// YouTube 채널 핸들 또는 ID 추출
+function extractYouTubeChannelInfo(url) {
+    // @handle 형식
+    let match = url.match(/youtube\.com\/@([^/?]+)/);
+    if (match) return { type: 'handle', value: match[1] };
+
+    // channel/ID 형식
+    match = url.match(/youtube\.com\/channel\/([^/?]+)/);
+    if (match) return { type: 'id', value: match[1] };
+
+    return null;
+}
+
 // URL에서 작성자 핸들 추출
 function extractAuthorHandle(url) {
     // TikTok: tiktok.com/@username/video/...
@@ -94,18 +120,95 @@ function extractAuthorHandle(url) {
     return null;
 }
 
+// YouTube Data API로 영상 정보 가져오기
+async function fetchYouTubeVideoInfo(videoId) {
+    try {
+        const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}&key=${YOUTUBE_API_KEY}`;
+        const response = await axios.get(apiUrl, { timeout: 8000 });
+
+        if (response.data.items && response.data.items.length > 0) {
+            const item = response.data.items[0];
+            const snippet = item.snippet;
+            const stats = item.statistics;
+
+            const viewCount = formatCount(stats.viewCount);
+            const likeCount = formatCount(stats.likeCount);
+            const commentCount = formatCount(stats.commentCount);
+
+            // description 포맷: "조회수 10만 · 좋아요 1.5만 · 댓글 500"
+            const descParts = [];
+            if (viewCount) descParts.push(`조회수 ${viewCount}`);
+            if (likeCount) descParts.push(`좋아요 ${likeCount}개`);
+            if (commentCount) descParts.push(`댓글 ${commentCount}개`);
+
+            return {
+                title: snippet.title,
+                thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+                description: descParts.join(' · '),
+                author: snippet.channelTitle
+            };
+        }
+    } catch (e) {
+        console.log('YouTube API failed:', e.message);
+    }
+    return null;
+}
+
+// YouTube Data API로 채널 정보 가져오기
+async function fetchYouTubeChannelInfo(channelInfo) {
+    try {
+        let apiUrl;
+        if (channelInfo.type === 'handle') {
+            apiUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&forHandle=${channelInfo.value}&key=${YOUTUBE_API_KEY}`;
+        } else {
+            apiUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelInfo.value}&key=${YOUTUBE_API_KEY}`;
+        }
+
+        const response = await axios.get(apiUrl, { timeout: 8000 });
+
+        if (response.data.items && response.data.items.length > 0) {
+            const item = response.data.items[0];
+            const snippet = item.snippet;
+            const stats = item.statistics;
+
+            const subCount = formatCount(stats.subscriberCount);
+            const videoCount = formatCount(stats.videoCount);
+
+            // description 포맷: "구독자 100만명 · 동영상 500개"
+            const descParts = [];
+            if (subCount) descParts.push(`구독자 ${subCount}명`);
+            if (videoCount) descParts.push(`동영상 ${videoCount}개`);
+
+            return {
+                title: snippet.title,
+                thumbnail: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url || '',
+                description: descParts.join(' · '),
+                author: `@${channelInfo.value}`
+            };
+        }
+    } catch (e) {
+        console.log('YouTube Channel API failed:', e.message);
+    }
+    return null;
+}
+
 // OG 태그 파싱
 async function fetchOgTags(url, platform, type) {
     try {
         const authorHandle = extractAuthorHandle(url);
 
-        // YouTube 영상 처리
-        if (platform === 'youtube') {
+        // ===== YouTube 영상 =====
+        if (platform === 'youtube' && type === 'video') {
             const videoId = extractYouTubeVideoId(url);
             if (videoId) {
-                // 영상인 경우
-                const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+                // YouTube API로 정보 가져오기
+                const apiResult = await fetchYouTubeVideoInfo(videoId);
+                if (apiResult) {
+                    return apiResult;
+                }
 
+                // API 실패 시 OG 태그 폴백
+                const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
                 try {
                     const response = await axios.get(url, {
                         headers: {
@@ -117,28 +220,32 @@ async function fetchOgTags(url, platform, type) {
                     const $ = cheerio.load(response.data);
                     const title = $('meta[property="og:title"]').attr('content') ||
                                  $('title').text()?.replace(' - YouTube', '') || 'YouTube Video';
-
-                    // 채널명 추출 시도
-                    const channelName = $('link[itemprop="name"]').attr('content') ||
-                                       $('span[itemprop="author"] link[itemprop="name"]').attr('content') || '';
-
-                    const author = channelName || authorHandle;
-                    // description에 작성자 정보 포함 (DB 저장용)
-                    const description = author ? `작성자: ${author}` : '';
+                    const channelName = $('link[itemprop="name"]').attr('content') || '';
 
                     return {
                         title,
-                        description,
+                        description: channelName ? `작성자: ${channelName}` : '',
                         thumbnail,
-                        author
+                        author: channelName || authorHandle
                     };
                 } catch {
-                    const description = authorHandle ? `작성자: ${authorHandle}` : '';
-                    return { title: 'YouTube Video', description, thumbnail, author: authorHandle };
+                    return { title: 'YouTube Video', description: '', thumbnail, author: authorHandle };
+                }
+            }
+        }
+
+        // ===== YouTube 채널 =====
+        if (platform === 'youtube' && type === 'channel') {
+            const channelInfo = extractYouTubeChannelInfo(url);
+            if (channelInfo) {
+                // YouTube API로 정보 가져오기
+                const apiResult = await fetchYouTubeChannelInfo(channelInfo);
+                if (apiResult) {
+                    return apiResult;
                 }
             }
 
-            // 채널인 경우 (videoId가 없음)
+            // API 실패 시 OG 태그 폴백
             try {
                 const response = await axios.get(url, {
                     headers: {
@@ -153,37 +260,59 @@ async function fetchOgTags(url, platform, type) {
                 const ogDescription = $('meta[property="og:description"]').attr('content') || '';
                 const thumbnail = $('meta[property="og:image"]').attr('content') || '';
 
-                // 구독자 수 추출
-                const subsMatch = ogDescription.match(/구독자\s*([\d,.만억KkMm]+)\s*명?/);
-                const description = subsMatch ? `구독자 ${subsMatch[1]}명` : (authorHandle || ogDescription);
+                // 구독자 수 추출 (한글/영문)
+                const subsMatch = ogDescription.match(/구독자\s*([\d,.만억KkMm]+)\s*명?|([\d,.KkMm]+)\s*[Ss]ubscribers?/i);
+                const subs = subsMatch?.[1] || subsMatch?.[2];
+                const description = subs ? `구독자 ${subs}명` : ogDescription;
 
                 return { title, description, thumbnail, author: authorHandle };
             } catch {
-                return { title: 'YouTube Channel', description: authorHandle || '', thumbnail: '', author: authorHandle };
+                return { title: 'YouTube Channel', description: '', thumbnail: '', author: authorHandle };
             }
         }
 
-        // TikTok 영상 - oEmbed 사용
-        if (platform === 'tiktok' && url.includes('/video/')) {
+        // ===== TikTok 영상 =====
+        // OG 태그에서 좋아요/댓글 정보 가져오기 (oEmbed는 통계 없음)
+        if (platform === 'tiktok' && type === 'video') {
             try {
-                const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
-                const response = await axios.get(oembedUrl, { timeout: 8000 });
-                if (response.data) {
-                    const author = response.data.author_name || authorHandle;
-                    return {
-                        title: response.data.title || 'TikTok Video',
-                        description: author ? `작성자: ${author}` : '',
-                        thumbnail: response.data.thumbnail_url || '',
-                        author: author
-                    };
-                }
-            } catch (e) {
-                console.log('TikTok oEmbed failed:', e.message);
+                const response = await axios.get(url, {
+                    headers: {
+                        'User-Agent': 'facebookexternalhit/1.1',
+                        'Accept': 'text/html',
+                        'Accept-Language': 'ko-KR,ko;q=0.9'
+                    },
+                    timeout: 10000,
+                    maxRedirects: 5
+                });
+                const $ = cheerio.load(response.data);
+
+                const title = $('meta[property="og:title"]').attr('content') ||
+                             $('title').text() || 'TikTok Video';
+                const ogDescription = $('meta[property="og:description"]').attr('content') || '';
+                const thumbnail = $('meta[property="og:image"]').attr('content') || '';
+
+                // TikTok OG description 형식: "좋아요 570.5K개 · 댓글 7606개"
+                return { title, description: ogDescription, thumbnail, author: authorHandle };
+            } catch {
+                // OG 실패 시 oEmbed 시도
+                try {
+                    const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
+                    const response = await axios.get(oembedUrl, { timeout: 8000 });
+                    if (response.data) {
+                        return {
+                            title: response.data.title || 'TikTok Video',
+                            description: `작성자: ${response.data.author_name || authorHandle}`,
+                            thumbnail: response.data.thumbnail_url || '',
+                            author: response.data.author_name || authorHandle
+                        };
+                    }
+                } catch {}
+                return { title: 'TikTok Video', description: '', thumbnail: '', author: authorHandle };
             }
         }
 
-        // TikTok 채널
-        if (platform === 'tiktok' && !url.includes('/video/')) {
+        // ===== TikTok 채널 =====
+        if (platform === 'tiktok' && type === 'channel') {
             try {
                 const response = await axios.get(url, {
                     headers: {
@@ -198,8 +327,15 @@ async function fetchOgTags(url, platform, type) {
 
                 const title = $('meta[property="og:title"]').attr('content') ||
                              $('title').text() || 'TikTok';
-                const description = $('meta[property="og:description"]').attr('content') || '';
+                const ogDescription = $('meta[property="og:description"]').attr('content') || '';
                 const thumbnail = $('meta[property="og:image"]').attr('content') || '';
+
+                // TikTok 영문 팔로워를 한글로 변환: "12.5M Followers" -> "팔로워 12.5M명"
+                let description = ogDescription;
+                const followersMatch = ogDescription.match(/([\d.]+[KkMm]?)\s*[Ff]ollowers?/i);
+                if (followersMatch) {
+                    description = `팔로워 ${followersMatch[1]}명`;
+                }
 
                 return { title, description, thumbnail, author: authorHandle };
             } catch {
@@ -212,7 +348,7 @@ async function fetchOgTags(url, platform, type) {
             }
         }
 
-        // Instagram - OG 태그 파싱
+        // ===== Instagram 영상/채널 =====
         if (platform === 'instagram') {
             try {
                 const response = await axios.get(url, {
@@ -245,7 +381,7 @@ async function fetchOgTags(url, platform, type) {
             }
         }
 
-        // 일반 OG 태그 파싱
+        // ===== 기타 플랫폼 =====
         const response = await axios.get(url, {
             headers: {
                 'User-Agent': 'facebookexternalhit/1.1',
