@@ -52,11 +52,12 @@ const Home = () => {
     const [filterVideoType, setFilterVideoType] = useState('all');
     const [filterTag, setFilterTag] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
 
     // 데이터 로드
     useEffect(() => {
         loadData();
-    }, [sortBy, filterPlatform, filterVideoType, filterTag, searchQuery, activeFolder]);
+    }, [sortBy, filterPlatform, filterVideoType, filterTag, searchQuery, activeFolder, showUnassignedOnly]);
 
     // 선택 모드 토글
     useEffect(() => {
@@ -81,7 +82,8 @@ const Home = () => {
 
             const [videosRes, channelsRes, foldersRes, tagsRes] = await Promise.all([
                 videosApi.getAll({
-                    channel_id: 'null',
+                    channel_id: showUnassignedOnly ? undefined : 'null',
+                    unassigned: showUnassignedOnly || undefined,
                     sort: sortBy,
                     platform: filterPlatform !== 'all' ? filterPlatform : undefined,
                     video_type: filterVideoType !== 'all' ? filterVideoType : undefined,
@@ -198,9 +200,22 @@ const Home = () => {
         try {
             await foldersApi.moveChannels(folder.id, [channel.id]);
             await loadData();
+            toast.success(`${folder.name} 폴더로 이동했습니다.`);
         } catch (error) {
             console.error('채널 이동 오류:', error);
             toast.error('채널을 폴더로 이동하는데 실패했습니다.');
+        }
+    };
+
+    // 영상을 폴더로 드래그앤드롭 이동
+    const handleVideoDropToFolder = async (video, folder) => {
+        try {
+            await foldersApi.moveVideos(folder.id, [video.id]);
+            setVideos(prev => prev.filter(v => v.id !== video.id));
+            toast.success(`${folder.name} 폴더로 이동했습니다.`);
+        } catch (error) {
+            console.error('영상 이동 오류:', error);
+            toast.error('영상을 폴더로 이동하는데 실패했습니다.');
         }
     };
 
@@ -410,15 +425,30 @@ const Home = () => {
         }
     };
 
-    // 선택 항목을 폴더로 이동
-    const handleMoveToFolder = async (folderId) => {
+    // 선택한 채널을 폴더로 이동
+    const handleMoveChannelsToFolder = async (folderId) => {
         if (selectedChannels.size === 0) return;
 
         try {
             await foldersApi.moveChannels(folderId, Array.from(selectedChannels));
             await loadData();
             clearSelection();
-            toast.success('폴더로 이동했습니다.');
+            toast.success('채널을 폴더로 이동했습니다.');
+        } catch (error) {
+            console.error('폴더 이동 오류:', error);
+            toast.error('폴더 이동 중 오류가 발생했습니다.');
+        }
+    };
+
+    // 선택한 영상을 폴더로 이동
+    const handleMoveVideosToFolder = async (folderId) => {
+        if (selectedVideos.size === 0) return;
+
+        try {
+            await foldersApi.moveVideos(folderId, Array.from(selectedVideos));
+            setVideos(prev => prev.filter(v => !selectedVideos.has(v.id)));
+            clearSelection();
+            toast.success('영상을 폴더로 이동했습니다.');
         } catch (error) {
             console.error('폴더 이동 오류:', error);
             toast.error('폴더 이동 중 오류가 발생했습니다.');
@@ -569,24 +599,44 @@ const Home = () => {
                                 <span className="hidden sm:inline text-xs opacity-60">(ESC로 취소)</span>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
+                                {/* 채널 폴더 이동 */}
                                 {selectedChannels.size > 0 && (
                                     <select
                                         onChange={(e) => {
                                             if (e.target.value) {
-                                                handleMoveToFolder(e.target.value);
+                                                handleMoveChannelsToFolder(e.target.value);
                                                 e.target.value = '';
                                             }
                                         }}
                                         className="px-3 py-2 sm:py-1.5 text-sm bg-white/20 hover:bg-white/30 rounded-lg text-white border-0 cursor-pointer min-h-[44px] sm:min-h-0"
                                         defaultValue=""
                                     >
-                                        <option value="" disabled>폴더로 이동</option>
+                                        <option value="" disabled>채널 → 폴더</option>
                                         <option value="null">미분류</option>
                                         {folders.map(folder => (
                                             <option key={folder.id} value={folder.id}>{folder.name}</option>
                                         ))}
                                     </select>
                                 )}
+                                {/* 영상 폴더 이동 */}
+                                {selectedVideos.size > 0 && (
+                                    <select
+                                        onChange={(e) => {
+                                            if (e.target.value) {
+                                                handleMoveVideosToFolder(e.target.value);
+                                                e.target.value = '';
+                                            }
+                                        }}
+                                        className="px-3 py-2 sm:py-1.5 text-sm bg-white/20 hover:bg-white/30 rounded-lg text-white border-0 cursor-pointer min-h-[44px] sm:min-h-0"
+                                        defaultValue=""
+                                    >
+                                        <option value="" disabled>영상 → 폴더</option>
+                                        {folders.map(folder => (
+                                            <option key={folder.id} value={folder.id}>{folder.name}</option>
+                                        ))}
+                                    </select>
+                                )}
+                                {/* 태그 추가 */}
                                 {selectedVideos.size > 0 && (
                                     <button
                                         onClick={() => setShowBatchTagModal(true)}
@@ -719,6 +769,29 @@ const Home = () => {
                                             handleFolderTabClick(folder.id);
                                         }
                                     }}
+                                    onDragOver={(e) => {
+                                        e.preventDefault();
+                                        e.dataTransfer.dropEffect = 'move';
+                                        e.currentTarget.classList.add('ring-2', 'ring-green-400', 'scale-105');
+                                    }}
+                                    onDragLeave={(e) => {
+                                        e.currentTarget.classList.remove('ring-2', 'ring-green-400', 'scale-105');
+                                    }}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        e.currentTarget.classList.remove('ring-2', 'ring-green-400', 'scale-105');
+                                        const channelData = e.dataTransfer.getData('channel');
+                                        if (channelData) {
+                                            const channel = JSON.parse(channelData);
+                                            handleChannelDropToFolder(channel, folder);
+                                            return;
+                                        }
+                                        const videoData = e.dataTransfer.getData('video');
+                                        if (videoData) {
+                                            const video = JSON.parse(videoData);
+                                            handleVideoDropToFolder(video, folder);
+                                        }
+                                    }}
                                     className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-full text-sm font-medium transition-all duration-200 group min-h-[44px] sm:min-h-0 snap-start cursor-pointer ${
                                         activeFolder === folder.id
                                             ? 'bg-primary-500 text-white shadow-md'
@@ -732,6 +805,7 @@ const Home = () => {
                                     <span className="truncate max-w-[80px] sm:max-w-[100px]">{folder.name}</span>
                                     <span className={`text-xs ${activeFolder === folder.id ? 'opacity-70' : 'text-gray-400'}`}>
                                         {folder.channel_count || 0}
+                                        {(folder.video_count || 0) > 0 && `+${folder.video_count}`}
                                     </span>
                                     {/* 폴더 편집 버튼 (호버 시 / 모바일에서는 항상 표시) */}
                                     <button
@@ -787,6 +861,7 @@ const Home = () => {
                                     folder={folder}
                                     onClick={() => navigate(`/folder/${folder.id}`)}
                                     onChannelDrop={handleChannelDropToFolder}
+                                    onVideoDrop={handleVideoDropToFolder}
                                     onEdit={handleFolderEdit}
                                     onDelete={handleDeleteFolder}
                                     isSelected={selectedFolders.has(folder.id)}
@@ -844,11 +919,22 @@ const Home = () => {
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                                 <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                                    <span>저장한 영상</span>
+                                    <span>{showUnassignedOnly ? '미분류 영상' : '저장한 영상'}</span>
                                     <span className="text-xs sm:text-sm font-normal text-gray-500">
                                         {videos.length}개
                                     </span>
                                 </h2>
+                                {/* 미분류만 토글 */}
+                                <button
+                                    onClick={() => setShowUnassignedOnly(!showUnassignedOnly)}
+                                    className={`text-xs px-2 py-1 rounded-full transition-colors ${
+                                        showUnassignedOnly
+                                            ? 'bg-orange-500 text-white'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    {showUnassignedOnly ? '✓ 미분류만' : '미분류만'}
+                                </button>
                                 {/* 전체 선택 버튼 */}
                                 {videos.length > 0 && (
                                     <button

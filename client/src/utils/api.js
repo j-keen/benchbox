@@ -107,6 +107,11 @@ export const videosApi = {
             query = query.eq('folder_id', params.folder_id);
         }
 
+        // 완전 미분류 (폴더도 채널도 없는 영상)
+        if (params.unassigned) {
+            query = query.is('channel_id', null).is('folder_id', null);
+        }
+
         if (params.platform && params.platform !== 'all') {
             query = query.eq('platform', params.platform);
         }
@@ -115,9 +120,7 @@ export const videosApi = {
             query = query.eq('video_type', params.video_type);
         }
 
-        if (params.search) {
-            query = query.or(`title.ilike.%${params.search}%,memo.ilike.%${params.search}%`);
-        }
+        // 검색은 태그 포함해서 JS에서 처리 (아래 videosWithTags에서)
 
         switch (params.sort) {
             case 'oldest':
@@ -141,9 +144,23 @@ export const videosApi = {
                 .eq('video_id', video.id);
             const tags = tagData?.map(t => t.tags?.name).filter(Boolean) || [];
 
+            // 태그 필터
             if (params.tag && !tags.includes(params.tag)) {
                 return null;
             }
+
+            // 검색어로 태그도 검색 (# 제거 후 비교)
+            if (params.search) {
+                const searchLower = params.search.replace(/^#/, '').toLowerCase();
+                const titleMatch = video.title?.toLowerCase().includes(searchLower);
+                const memoMatch = video.memo?.toLowerCase().includes(searchLower);
+                const tagMatch = tags.some(tag => tag.toLowerCase().includes(searchLower));
+
+                if (!titleMatch && !memoMatch && !tagMatch) {
+                    return null;
+                }
+            }
+
             return { ...video, tags };
         }));
 
@@ -431,12 +448,17 @@ export const foldersApi = {
         if (error) throw error;
 
         const foldersWithCount = await Promise.all(folders.map(async (folder) => {
-            const { count } = await supabase
+            const { count: channelCount } = await supabase
                 .from('channels')
                 .select('*', { count: 'exact', head: true })
                 .eq('folder_id', folder.id);
 
-            return { ...folder, channel_count: count || 0 };
+            const { count: videoCount } = await supabase
+                .from('videos')
+                .select('*', { count: 'exact', head: true })
+                .eq('folder_id', folder.id);
+
+            return { ...folder, channel_count: channelCount || 0, video_count: videoCount || 0 };
         }));
 
         return { data: { folders: foldersWithCount } };

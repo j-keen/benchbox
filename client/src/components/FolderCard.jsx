@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 
-const FolderCard = ({ folder, onClick, onChannelDrop, onEdit, onDelete, isSelected, onSelect, selectionMode }) => {
+const FolderCard = ({ folder, onClick, onChannelDrop, onVideoDrop, onEdit, onDelete, isSelected, onSelect, selectionMode }) => {
     const [isDragOver, setIsDragOver] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
 
@@ -22,10 +22,20 @@ const FolderCard = ({ folder, onClick, onChannelDrop, onEdit, onDelete, isSelect
     const handleDrop = (e) => {
         e.preventDefault();
         setIsDragOver(false);
+
+        // 채널 드롭 처리
         const channelData = e.dataTransfer.getData('channel');
         if (channelData && onChannelDrop) {
             const channel = JSON.parse(channelData);
             onChannelDrop(channel, folder);
+            return;
+        }
+
+        // 영상 드롭 처리
+        const videoData = e.dataTransfer.getData('video');
+        if (videoData && onVideoDrop) {
+            const video = JSON.parse(videoData);
+            onVideoDrop(video, folder);
         }
     };
 
@@ -149,9 +159,16 @@ const FolderCard = ({ folder, onClick, onChannelDrop, onEdit, onDelete, isSelect
                     </div>
                 )}
 
-                {/* 채널 수 배지 */}
-                <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
-                    {folder.channel_count || 0}개 채널
+                {/* 채널/영상 수 배지 */}
+                <div className="absolute bottom-2 right-2 flex gap-1">
+                    <span className="bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
+                        📺 {folder.channel_count || 0}
+                    </span>
+                    {(folder.video_count || 0) > 0 && (
+                        <span className="bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
+                            🎬 {folder.video_count}
+                        </span>
+                    )}
                 </div>
 
                 {/* 선택 체크박스 - 좌상단 */}

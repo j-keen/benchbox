@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { videosApi, tagsApi, parseUrlApi } from '../utils/api';
+import { videosApi, tagsApi, parseUrlApi, foldersApi } from '../utils/api';
 import { useToast } from '../contexts/ToastContext';
 import VideoCard from '../components/VideoCard';
 import VideoModal from '../components/VideoModal';
@@ -12,6 +12,7 @@ const AllVideosPage = () => {
     const toast = useToast();
     const [videos, setVideos] = useState([]);
     const [tags, setTags] = useState([]);
+    const [folders, setFolders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedVideo, setSelectedVideo] = useState(null);
 
@@ -46,13 +47,15 @@ const AllVideosPage = () => {
             if (filterTag) params.tag = filterTag;
             if (searchQuery) params.search = searchQuery;
 
-            const [videosRes, tagsRes] = await Promise.all([
+            const [videosRes, tagsRes, foldersRes] = await Promise.all([
                 videosApi.getAll(params),
-                tagsApi.getAll()
+                tagsApi.getAll(),
+                foldersApi.getAll()
             ]);
 
             setVideos(videosRes.data.videos || []);
             setTags(tagsRes.data.tags || []);
+            setFolders(foldersRes.data.folders || []);
         } catch (error) {
             console.error('데이터 로드 오류:', error);
         } finally {
@@ -131,6 +134,21 @@ const AllVideosPage = () => {
         } catch (error) {
             console.error('태그 추가 오류:', error);
             toast.error('태그 추가에 실패했습니다.');
+        }
+    };
+
+    // 선택한 영상을 폴더로 이동
+    const handleMoveToFolder = async (folderId) => {
+        if (selectedVideos.size === 0) return;
+
+        try {
+            await foldersApi.moveVideos(folderId, Array.from(selectedVideos));
+            setVideos(prev => prev.filter(v => !selectedVideos.has(v.id)));
+            clearSelection();
+            toast.success('영상을 폴더로 이동했습니다.');
+        } catch (error) {
+            console.error('폴더 이동 오류:', error);
+            toast.error('폴더 이동 중 오류가 발생했습니다.');
         }
     };
 
@@ -228,6 +246,24 @@ const AllVideosPage = () => {
                         <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <span className="font-medium">{selectedVideos.size}개 선택됨</span>
                             <div className="flex flex-wrap items-center gap-2">
+                                {/* 폴더로 이동 */}
+                                {folders.length > 0 && (
+                                    <select
+                                        onChange={(e) => {
+                                            if (e.target.value) {
+                                                handleMoveToFolder(e.target.value);
+                                                e.target.value = '';
+                                            }
+                                        }}
+                                        className="px-3 py-2 sm:py-1.5 text-sm bg-white/20 hover:bg-white/30 rounded-lg text-white border-0 cursor-pointer min-h-[44px] sm:min-h-0"
+                                        defaultValue=""
+                                    >
+                                        <option value="" disabled>폴더로 이동</option>
+                                        {folders.map(folder => (
+                                            <option key={folder.id} value={folder.id}>{folder.name}</option>
+                                        ))}
+                                    </select>
+                                )}
                                 <button
                                     onClick={() => setShowBatchTagModal(true)}
                                     className="px-4 py-2 sm:py-1.5 text-sm bg-white/20 hover:bg-white/30 rounded-lg flex items-center gap-1 min-h-[44px] sm:min-h-0"
