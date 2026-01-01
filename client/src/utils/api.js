@@ -139,15 +139,20 @@ export const videosApi = {
         const { url, channel_id = null, folder_id = null, memo = '', tags = [], title, thumbnail, description } = data;
         const urlInfo = analyzeUrl(url);
 
-        // 중복 체크
-        const { data: existing } = await supabase
-            .from('videos')
-            .select('id')
-            .eq('url', url)
-            .single();
+        // 중복 체크 (에러 발생시 무시하고 진행)
+        try {
+            const { data: existing } = await supabase
+                .from('videos')
+                .select('id')
+                .eq('url', url)
+                .maybeSingle();
 
-        if (existing) {
-            throw { response: { status: 409, data: { error: '이미 저장된 영상입니다.', existingId: existing.id } } };
+            if (existing) {
+                throw { response: { status: 409, data: { error: '이미 저장된 영상입니다.', existingId: existing.id } } };
+            }
+        } catch (dupError) {
+            // 중복 체크 에러는 무시 (URL 특수문자 문제)
+            if (dupError.response?.status === 409) throw dupError;
         }
 
         const { data: savedVideo, error } = await supabase
@@ -281,9 +286,14 @@ export const channelsApi = {
         const { url, memo = '', title, thumbnail, description } = data;
         const urlInfo = analyzeUrl(url);
 
-        const { data: existing } = await supabase.from('channels').select('id').eq('url', url).single();
-        if (existing) {
-            throw { response: { status: 409, data: { error: '이미 등록된 채널입니다.', existingId: existing.id } } };
+        // 중복 체크 (에러 발생시 무시하고 진행)
+        try {
+            const { data: existing } = await supabase.from('channels').select('id').eq('url', url).maybeSingle();
+            if (existing) {
+                throw { response: { status: 409, data: { error: '이미 등록된 채널입니다.', existingId: existing.id } } };
+            }
+        } catch (dupError) {
+            if (dupError.response?.status === 409) throw dupError;
         }
 
         const { data: savedChannel, error } = await supabase
