@@ -136,7 +136,7 @@ export const videosApi = {
     },
 
     create: async (data) => {
-        const { url, channel_id = null, folder_id = null, memo = '', tags = [] } = data;
+        const { url, channel_id = null, folder_id = null, memo = '', tags = [], title, thumbnail, description } = data;
         const urlInfo = analyzeUrl(url);
 
         // 중복 체크
@@ -158,7 +158,9 @@ export const videosApi = {
                 folder_id: folder_id || null,
                 platform: urlInfo.platform,
                 video_type: urlInfo.videoType || 'long',
-                title: url, // 기본 제목
+                title: title || url,
+                thumbnail: thumbnail || null,
+                description: description || null,
                 memo
             })
             .select()
@@ -276,7 +278,7 @@ export const channelsApi = {
     },
 
     create: async (data) => {
-        const { url, memo = '' } = data;
+        const { url, memo = '', title, thumbnail, description } = data;
         const urlInfo = analyzeUrl(url);
 
         const { data: existing } = await supabase.from('channels').select('id').eq('url', url).single();
@@ -289,7 +291,9 @@ export const channelsApi = {
             .insert({
                 url,
                 platform: urlInfo.platform,
-                title: url,
+                title: title || url,
+                thumbnail: thumbnail || null,
+                description: description || null,
                 memo
             })
             .select()
@@ -628,21 +632,36 @@ export const tagsApi = {
     }
 };
 
-// URL 파싱 API (클라이언트에서 처리)
+// URL 파싱 API (서버에서 OG 태그 파싱)
+const API_BASE = 'http://localhost:3001/api';
+
 export const parseUrlApi = {
     parse: async (url) => {
-        const urlInfo = analyzeUrl(url);
-        return {
-            data: {
-                platform: urlInfo.platform,
-                type: urlInfo.type,
-                videoType: urlInfo.videoType,
-                url: urlInfo.url,
-                title: url,
-                thumbnail: '',
-                description: ''
-            }
-        };
+        try {
+            const response = await fetch(`${API_BASE}/parse-url`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            });
+            if (!response.ok) throw new Error('파싱 실패');
+            const data = await response.json();
+            return { data };
+        } catch (error) {
+            // 서버 파싱 실패 시 로컬 fallback
+            console.log('서버 파싱 실패, 로컬 처리:', error.message);
+            const urlInfo = analyzeUrl(url);
+            return {
+                data: {
+                    platform: urlInfo.platform,
+                    type: urlInfo.type,
+                    videoType: urlInfo.videoType,
+                    url: urlInfo.url,
+                    title: url,
+                    thumbnail: '',
+                    description: ''
+                }
+            };
+        }
     }
 };
 

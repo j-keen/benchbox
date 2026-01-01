@@ -10,6 +10,10 @@ import * as cheerio from 'cheerio';
 export async function fetchOgTags(url, platform = 'other') {
     try {
         // 플랫폼별 특수 처리
+        if (platform === 'youtube') {
+            return await fetchYouTubeInfo(url);
+        }
+
         if (platform === 'tiktok') {
             return await fetchTikTokInfo(url);
         }
@@ -62,6 +66,80 @@ async function fetchGenericOgTags(url) {
         siteName: $('meta[property="og:site_name"]').attr('content') ||
                  ''
     };
+}
+
+/**
+ * YouTube 정보 추출
+ */
+async function fetchYouTubeInfo(url) {
+    // 비디오 ID 추출
+    const videoId = extractYouTubeVideoId(url);
+
+    if (videoId) {
+        // 썸네일 URL 직접 생성 (API 없이 가능)
+        const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+        const hqThumbnail = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+
+        try {
+            // OG 태그에서 제목 가져오기 시도
+            const response = await axios.get(url, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
+                },
+                timeout: 10000,
+                maxRedirects: 5
+            });
+
+            const $ = cheerio.load(response.data);
+            const title = $('meta[property="og:title"]').attr('content') ||
+                         $('meta[name="twitter:title"]').attr('content') ||
+                         $('title').text()?.replace(' - YouTube', '') ||
+                         'YouTube Video';
+            const description = $('meta[property="og:description"]').attr('content') ||
+                               $('meta[name="twitter:description"]').attr('content') ||
+                               '';
+
+            return {
+                title,
+                description,
+                thumbnail: thumbnail,
+                siteName: 'YouTube'
+            };
+        } catch (e) {
+            // 페이지 요청 실패해도 썸네일은 사용 가능
+            console.log('YouTube 페이지 요청 실패, 썸네일만 사용:', e.message);
+            return {
+                title: 'YouTube Video',
+                description: '',
+                thumbnail: hqThumbnail, // maxres 없을 수 있으니 hq 사용
+                siteName: 'YouTube'
+            };
+        }
+    }
+
+    // 채널 URL인 경우 일반 OG 파싱
+    return await fetchGenericOgTags(url);
+}
+
+/**
+ * YouTube URL에서 비디오 ID 추출
+ */
+function extractYouTubeVideoId(url) {
+    // youtube.com/watch?v=VIDEO_ID
+    let match = url.match(/youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/);
+    if (match) return match[1];
+
+    // youtu.be/VIDEO_ID
+    match = url.match(/youtu\.be\/([a-zA-Z0-9_-]+)/);
+    if (match) return match[1];
+
+    // youtube.com/shorts/VIDEO_ID
+    match = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]+)/);
+    if (match) return match[1];
+
+    return null;
 }
 
 /**

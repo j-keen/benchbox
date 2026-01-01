@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { videosApi, channelsApi, tagsApi, foldersApi } from '../utils/api';
+import { videosApi, channelsApi, tagsApi, foldersApi, parseUrlApi } from '../utils/api';
 import { useToast } from '../contexts/ToastContext';
 import { useKeyboardShortcuts, useGlobalPaste } from '../hooks/useKeyboardShortcuts';
 import VideoCard from '../components/VideoCard';
@@ -108,12 +108,20 @@ const Home = () => {
     const handleSaveUrl = async (data) => {
         try {
             if (data.isChannel) {
-                const response = await channelsApi.create({ url: data.url });
+                const response = await channelsApi.create({
+                    url: data.url,
+                    title: data.title,
+                    thumbnail: data.thumbnail,
+                    description: data.description
+                });
                 setChannels(prev => [response.data, ...prev]);
             } else {
                 const response = await videosApi.create({
                     url: data.url,
-                    channel_id: data.channel_id
+                    channel_id: data.channel_id,
+                    title: data.title,
+                    thumbnail: data.thumbnail,
+                    description: data.description
                 });
                 if (!data.channel_id) {
                     setVideos(prev => [response.data, ...prev]);
@@ -132,13 +140,29 @@ const Home = () => {
 
     // 빠른 채널 URL 등록
     const handleQuickChannelAdd = async (url) => {
-        const response = await channelsApi.create({ url });
+        // 먼저 메타데이터 파싱
+        const parseResult = await parseUrlApi.parse(url);
+        const parsed = parseResult.data;
+        const response = await channelsApi.create({
+            url,
+            title: parsed.title,
+            thumbnail: parsed.thumbnail,
+            description: parsed.description
+        });
         setChannels(prev => [response.data, ...prev]);
     };
 
     // 빠른 영상 URL 등록
     const handleQuickVideoAdd = async (url) => {
-        const response = await videosApi.create({ url });
+        // 먼저 메타데이터 파싱
+        const parseResult = await parseUrlApi.parse(url);
+        const parsed = parseResult.data;
+        const response = await videosApi.create({
+            url,
+            title: parsed.title,
+            thumbnail: parsed.thumbnail,
+            description: parsed.description
+        });
         setVideos(prev => [response.data, ...prev]);
     };
 
@@ -249,6 +273,10 @@ const Home = () => {
     // 전역 URL 붙여넣기 처리
     const handleGlobalPaste = useCallback(async (url) => {
         try {
+            // 먼저 메타데이터 파싱
+            const parseResult = await parseUrlApi.parse(url);
+            const parsed = parseResult.data;
+
             // URL 패턴에 따라 영상인지 채널인지 자동 판단
             // 영상 URL 패턴을 먼저 체크 (더 구체적)
             const isVideo =
@@ -269,12 +297,22 @@ const Home = () => {
             );
 
             if (isChannel) {
-                const response = await channelsApi.create({ url });
+                const response = await channelsApi.create({
+                    url,
+                    title: parsed.title,
+                    thumbnail: parsed.thumbnail,
+                    description: parsed.description
+                });
                 setChannels(prev => [response.data, ...prev]);
                 toast.success('채널이 등록되었습니다.');
             } else {
                 // 기본값은 영상으로 처리
-                const response = await videosApi.create({ url });
+                const response = await videosApi.create({
+                    url,
+                    title: parsed.title,
+                    thumbnail: parsed.thumbnail,
+                    description: parsed.description
+                });
                 setVideos(prev => [response.data, ...prev]);
                 toast.success('영상이 등록되었습니다.');
             }
@@ -656,10 +694,18 @@ const Home = () => {
 
                             {/* 폴더 탭들 */}
                             {folders.map(folder => (
-                                <button
+                                <div
                                     key={folder.id}
+                                    role="button"
+                                    tabIndex={0}
                                     onClick={() => handleFolderTabClick(folder.id)}
-                                    className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-full text-sm font-medium transition-all duration-200 group min-h-[44px] sm:min-h-0 snap-start ${
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            handleFolderTabClick(folder.id);
+                                        }
+                                    }}
+                                    className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-full text-sm font-medium transition-all duration-200 group min-h-[44px] sm:min-h-0 snap-start cursor-pointer ${
                                         activeFolder === folder.id
                                             ? 'bg-primary-500 text-white shadow-md'
                                             : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
@@ -687,7 +733,7 @@ const Home = () => {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                         </svg>
                                     </button>
-                                </button>
+                                </div>
                             ))}
 
                             {/* 미분류 탭 */}

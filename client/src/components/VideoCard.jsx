@@ -209,6 +209,13 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
                     {video.title || 'Untitled'}
                 </h3>
 
+                {/* 설명 */}
+                {video.description && (
+                    <p className="mt-1 text-xs text-gray-500 line-clamp-2">
+                        {video.description}
+                    </p>
+                )}
+
                 {/* 태그 */}
                 {video.tags && video.tags.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">

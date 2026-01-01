@@ -9,6 +9,8 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [embedFailed, setEmbedFailed] = useState(false);
+    const [embedLoading, setEmbedLoading] = useState(true);
 
     const PlatformIcon = getPlatformIcon(video?.platform);
     const platformColor = getPlatformColor(video?.platform);
@@ -38,6 +40,25 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
             debouncedSave(memo, tags);
         }
     }, [memo, tags]);
+
+    // 영상 변경 시 임베드 상태 리셋
+    useEffect(() => {
+        setEmbedFailed(false);
+        setEmbedLoading(true);
+
+        // 3초 후 로딩 상태 해제 (실패 감지 불가하므로 시간 기반)
+        const timer = setTimeout(() => {
+            setEmbedLoading(false);
+        }, 3000);
+
+        return () => clearTimeout(timer);
+    }, [video?.id]);
+
+    // 임베드 문제 수동 전환
+    const handleEmbedProblem = () => {
+        setEmbedFailed(true);
+        setEmbedLoading(false);
+    };
 
     const handleDelete = async () => {
         if (!video) return;
@@ -123,25 +144,77 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                         {/* 좌측: 영상 정보 */}
                         <div className="md:w-3/5 p-3 sm:p-6 border-b md:border-b-0 md:border-r border-gray-100">
                             {/* 임베드 또는 썸네일 */}
-                            <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                                {embedUrl ? (
-                                    <iframe
-                                        src={embedUrl}
-                                        className="w-full h-full"
-                                        allowFullScreen
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    />
+                            <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden relative">
+                                {embedUrl && !embedFailed ? (
+                                    <>
+                                        {/* 로딩 중 썸네일 표시 */}
+                                        {embedLoading && video.thumbnail && (
+                                            <div className="absolute inset-0 z-10">
+                                                <img
+                                                    src={video.thumbnail}
+                                                    alt={video.title}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                                    <div className="animate-spin rounded-full h-10 w-10 border-4 border-white border-t-transparent"></div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <iframe
+                                            src={embedUrl}
+                                            className="w-full h-full"
+                                            allowFullScreen
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            onLoad={() => setEmbedLoading(false)}
+                                            onError={() => {
+                                                setEmbedFailed(true);
+                                                setEmbedLoading(false);
+                                            }}
+                                        />
+                                        {/* 재생 안됨 버튼 - 로딩 완료 후 표시 */}
+                                        {!embedLoading && (
+                                            <button
+                                                onClick={handleEmbedProblem}
+                                                className="absolute bottom-2 right-2 px-2 py-1 text-xs bg-black/60 hover:bg-black/80 text-white/80 hover:text-white rounded transition-colors"
+                                            >
+                                                재생 안됨?
+                                            </button>
+                                        )}
+                                    </>
                                 ) : video.thumbnail ? (
-                                    <img
-                                        src={video.thumbnail}
-                                        alt={video.title}
-                                        className="w-full h-full object-cover"
-                                    />
+                                    <div className="relative w-full h-full group">
+                                        <img
+                                            src={video.thumbnail}
+                                            alt={video.title}
+                                            className="w-full h-full object-cover"
+                                        />
+                                        {/* 오버레이 + 재생 버튼 */}
+                                        <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-3">
+                                            <button
+                                                onClick={openOriginalLink}
+                                                className="flex items-center gap-2 px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-full font-medium transition-all transform hover:scale-105 shadow-lg"
+                                            >
+                                                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+                                                </svg>
+                                                YouTube에서 보기
+                                            </button>
+                                            {embedFailed && (
+                                                <p className="text-white/80 text-sm">임베드가 차단된 영상입니다</p>
+                                            )}
+                                        </div>
+                                    </div>
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                    <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 gap-3">
                                         <svg className="w-12 h-12 sm:w-16 sm:h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                         </svg>
+                                        <button
+                                            onClick={openOriginalLink}
+                                            className="text-primary-500 hover:text-primary-600 text-sm font-medium"
+                                        >
+                                            원본에서 보기
+                                        </button>
                                     </div>
                                 )}
                             </div>

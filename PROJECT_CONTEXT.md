@@ -278,6 +278,17 @@ vercel --prod
 
 ## 최근 변경 이력
 
+### 2025-01-01
+
+- **YouTube 썸네일 직접 생성**: ogParser.js에 fetchYouTubeInfo(), extractYouTubeVideoId() 추가 (비디오 ID에서 썸네일 URL 직접 생성, YouTube Shorts 지원)
+- **OG 태그 파싱 연동**: 클라이언트 parseUrlApi가 서버 /api/parse-url 호출
+- **메타데이터 저장 기능**: title, thumbnail, description을 DB에 저장 (videosApi/channelsApi.create() 수정)
+- **VideoCard 설명 표시**: description 필드 표시 추가
+- **YouTube 임베드 실패 처리**: VideoModal에 embedFailed 상태 및 "재생 안됨?" 버튼 추가
+- **버튼 중첩 경고 수정**: Home.jsx에서 폴더 탭 버튼을 div role="button"으로 변경
+- **클라이언트 환경변수 설정**: client/.env 파일 생성
+- **서버 DB 클라이언트 생성**: server/db/database.js 파일 추가
+
 ### 2024-12-31
 - 모바일 레이아웃 개선 (ChannelDetail, VideoModal)
 - 롱프레스 선택 버그 수정
