@@ -38,6 +38,28 @@ function analyzeUrl(url) {
     return { platform: 'other', type: 'unknown' };
 }
 
+// 제목에서 플랫폼명 제거
+function cleanTitle(title, platform) {
+    if (!title) return title;
+
+    let cleaned = title;
+
+    // YouTube: " - YouTube" 제거
+    cleaned = cleaned.replace(/\s*-\s*YouTube\s*$/i, '');
+
+    // TikTok: "TikTok · " 또는 "TikTok・" 제거
+    cleaned = cleaned.replace(/^TikTok\s*[·・]\s*/i, '');
+
+    // Instagram: "Instagram의 " 또는 "Instagram: " 제거
+    cleaned = cleaned.replace(/^Instagram의\s*/i, '');
+    cleaned = cleaned.replace(/^.*?\s+on\s+Instagram:\s*/i, '');
+
+    // 앞뒤 공백 정리
+    cleaned = cleaned.trim();
+
+    return cleaned || title;
+}
+
 // YouTube 비디오 ID 추출
 function extractYouTubeVideoId(url) {
     let match = url.match(/youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/);
@@ -152,7 +174,7 @@ export default async function handler(req, res) {
             platform: urlInfo.platform,
             type: urlInfo.type,
             videoType: urlInfo.videoType,
-            title: ogData.title,
+            title: cleanTitle(ogData.title, urlInfo.platform),
             thumbnail: ogData.thumbnail,
             description: ogData.description,
             url: url
