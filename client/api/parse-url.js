@@ -31,8 +31,12 @@ function analyzeUrl(url) {
     if (/instagram\.com\/p\//.test(normalizedUrl)) {
         return { platform: 'instagram', type: 'video', videoType: 'long' };
     }
-    if (/instagram\.com\/[a-zA-Z0-9_.-]+\/?$/.test(normalizedUrl)) {
-        return { platform: 'instagram', type: 'channel' };
+    // Instagram 채널 - 쿼리 파라미터 허용 (?igsh= 등)
+    if (/instagram\.com\/([a-zA-Z0-9_.-]+)\/?(\?.*)?$/.test(normalizedUrl)) {
+        const match = normalizedUrl.match(/instagram\.com\/([a-zA-Z0-9_.-]+)/);
+        if (match && !['p', 'reel', 'reels', 'stories', 'explore', 'direct'].includes(match[1])) {
+            return { platform: 'instagram', type: 'channel' };
+        }
     }
 
     return { platform: 'other', type: 'unknown' };
@@ -113,20 +117,24 @@ async function fetchOgTags(url, platform, type) {
                     const $ = cheerio.load(response.data);
                     const title = $('meta[property="og:title"]').attr('content') ||
                                  $('title').text()?.replace(' - YouTube', '') || 'YouTube Video';
-                    const description = $('meta[property="og:description"]').attr('content') || '';
 
                     // 채널명 추출 시도
                     const channelName = $('link[itemprop="name"]').attr('content') ||
                                        $('span[itemprop="author"] link[itemprop="name"]').attr('content') || '';
 
+                    const author = channelName || authorHandle;
+                    // description에 작성자 정보 포함 (DB 저장용)
+                    const description = author ? `작성자: ${author}` : '';
+
                     return {
                         title,
                         description,
                         thumbnail,
-                        author: channelName || authorHandle
+                        author
                     };
                 } catch {
-                    return { title: 'YouTube Video', description: '', thumbnail, author: authorHandle };
+                    const description = authorHandle ? `작성자: ${authorHandle}` : '';
+                    return { title: 'YouTube Video', description, thumbnail, author: authorHandle };
                 }
             }
 
@@ -142,12 +150,16 @@ async function fetchOgTags(url, platform, type) {
                 const $ = cheerio.load(response.data);
                 const title = $('meta[property="og:title"]').attr('content') ||
                              $('title').text()?.replace(' - YouTube', '') || 'YouTube Channel';
-                const description = $('meta[property="og:description"]').attr('content') || '';
+                const ogDescription = $('meta[property="og:description"]').attr('content') || '';
                 const thumbnail = $('meta[property="og:image"]').attr('content') || '';
+
+                // 구독자 수 추출
+                const subsMatch = ogDescription.match(/구독자\s*([\d,.만억KkMm]+)\s*명?/);
+                const description = subsMatch ? `구독자 ${subsMatch[1]}명` : (authorHandle || ogDescription);
 
                 return { title, description, thumbnail, author: authorHandle };
             } catch {
-                return { title: 'YouTube Channel', description: '', thumbnail: '', author: authorHandle };
+                return { title: 'YouTube Channel', description: authorHandle || '', thumbnail: '', author: authorHandle };
             }
         }
 
