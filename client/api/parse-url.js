@@ -272,8 +272,27 @@ async function fetchOgTags(url, platform, type) {
         }
 
         // ===== TikTok 영상 =====
-        // OG 태그에서 좋아요/댓글 정보 가져오기 (oEmbed는 통계 없음)
+        // oEmbed API를 먼저 시도 (공식 API라 더 안정적)
         if (platform === 'tiktok' && type === 'video') {
+            let oembedData = null;
+            let ogData = null;
+
+            // 1. oEmbed API 시도 (썸네일 확보)
+            try {
+                const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
+                const response = await axios.get(oembedUrl, { timeout: 8000 });
+                if (response.data) {
+                    oembedData = {
+                        title: response.data.title || 'TikTok Video',
+                        thumbnail: response.data.thumbnail_url || '',
+                        author: response.data.author_name || authorHandle
+                    };
+                }
+            } catch (e) {
+                console.log('TikTok oEmbed failed:', e.message);
+            }
+
+            // 2. OG 태그도 시도 (좋아요/댓글 통계 확보)
             try {
                 const response = await axios.get(url, {
                     headers: {
@@ -287,28 +306,26 @@ async function fetchOgTags(url, platform, type) {
                 const $ = cheerio.load(response.data);
 
                 const title = $('meta[property="og:title"]').attr('content') ||
-                             $('title').text() || 'TikTok Video';
+                             $('title').text() || '';
                 const ogDescription = $('meta[property="og:description"]').attr('content') || '';
                 const thumbnail = $('meta[property="og:image"]').attr('content') || '';
 
-                // TikTok OG description 형식: "좋아요 570.5K개 · 댓글 7606개"
-                return { title, description: ogDescription, thumbnail, author: authorHandle };
-            } catch {
-                // OG 실패 시 oEmbed 시도
-                try {
-                    const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
-                    const response = await axios.get(oembedUrl, { timeout: 8000 });
-                    if (response.data) {
-                        return {
-                            title: response.data.title || 'TikTok Video',
-                            description: `작성자: ${response.data.author_name || authorHandle}`,
-                            thumbnail: response.data.thumbnail_url || '',
-                            author: response.data.author_name || authorHandle
-                        };
-                    }
-                } catch {}
-                return { title: 'TikTok Video', description: '', thumbnail: '', author: authorHandle };
+                ogData = { title, description: ogDescription, thumbnail };
+            } catch (e) {
+                console.log('TikTok OG failed:', e.message);
             }
+
+            // 3. 결과 조합 (oEmbed 썸네일 우선, OG 설명 우선)
+            if (oembedData || ogData) {
+                return {
+                    title: oembedData?.title || ogData?.title || 'TikTok Video',
+                    description: ogData?.description || `작성자: ${oembedData?.author || authorHandle}`,
+                    thumbnail: oembedData?.thumbnail || ogData?.thumbnail || '',
+                    author: oembedData?.author || authorHandle
+                };
+            }
+
+            return { title: 'TikTok Video', description: '', thumbnail: '', author: authorHandle };
         }
 
         // ===== TikTok 채널 =====

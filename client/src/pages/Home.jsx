@@ -5,7 +5,6 @@ import { useToast } from '../contexts/ToastContext';
 import { useKeyboardShortcuts, useGlobalPaste } from '../hooks/useKeyboardShortcuts';
 import VideoCard from '../components/VideoCard';
 import ChannelCard, { AddChannelCard } from '../components/ChannelCard';
-import FolderCard from '../components/FolderCard';
 import UrlInput from '../components/UrlInput';
 import VideoModal from '../components/VideoModal';
 import FolderModal from '../components/FolderModal';
@@ -82,7 +81,6 @@ const Home = () => {
 
             const [videosRes, channelsRes, foldersRes, tagsRes] = await Promise.all([
                 videosApi.getAll({
-                    channel_id: showUnassignedOnly ? undefined : 'null',
                     unassigned: showUnassignedOnly || undefined,
                     sort: sortBy,
                     platform: filterPlatform !== 'all' ? filterPlatform : undefined,
@@ -851,26 +849,6 @@ const Home = () => {
                             </button>
                         </div>
                     </div>
-
-                    {/* 폴더 드롭 영역 (전체 보기일 때만 - 채널 드래그 시 사용) */}
-                    {activeFolder === null && folders.length > 0 && (
-                        <div className="mb-4 flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                            {folders.map(folder => (
-                                <FolderCard
-                                    key={`folder-${folder.id}`}
-                                    folder={folder}
-                                    onClick={() => navigate(`/folder/${folder.id}`)}
-                                    onChannelDrop={handleChannelDropToFolder}
-                                    onVideoDrop={handleVideoDropToFolder}
-                                    onEdit={handleFolderEdit}
-                                    onDelete={handleDeleteFolder}
-                                    isSelected={selectedFolders.has(folder.id)}
-                                    onSelect={handleFolderSelect}
-                                    selectionMode={selectionMode}
-                                />
-                            ))}
-                        </div>
-                    )}
 
                     {/* 채널 그리드 */}
                     <div

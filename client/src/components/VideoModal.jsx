@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { videosApi } from '../utils/api';
 import { getPlatformIcon, getPlatformColor, getPlatformName } from '../utils/platformIcons';
 import TagInput from './TagInput';
@@ -11,6 +11,7 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [embedFailed, setEmbedFailed] = useState(false);
     const [embedLoading, setEmbedLoading] = useState(true);
+    const tiktokContainerRef = useRef(null);
 
     const PlatformIcon = getPlatformIcon(video?.platform);
     const platformColor = getPlatformColor(video?.platform);
@@ -89,7 +90,51 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
         });
     };
 
-    // 임베드 URL 생성
+    // TikTok 비디오 ID 추출
+    const getTikTokVideoId = (url) => {
+        if (!url) return null;
+        const match = url.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
+        return match ? match[1] : null;
+    };
+
+    // TikTok embed.js 로드 및 렌더링
+    useEffect(() => {
+        if (video?.platform === 'tiktok' && tiktokContainerRef.current) {
+            const videoId = getTikTokVideoId(video.url);
+            if (!videoId) return;
+
+            // blockquote 생성
+            tiktokContainerRef.current.innerHTML = `
+                <blockquote class="tiktok-embed" cite="${video.url}" data-video-id="${videoId}" style="max-width: 100%; min-width: 100%;">
+                    <section></section>
+                </blockquote>
+            `;
+
+            // embed.js 스크립트 로드
+            const existingScript = document.querySelector('script[src="https://www.tiktok.com/embed.js"]');
+            if (existingScript) {
+                // 이미 로드된 경우 새로고침
+                if (window.tiktok && window.tiktok.widgets && window.tiktok.widgets.load) {
+                    window.tiktok.widgets.load();
+                } else {
+                    existingScript.remove();
+                    const script = document.createElement('script');
+                    script.src = 'https://www.tiktok.com/embed.js';
+                    script.async = true;
+                    document.body.appendChild(script);
+                }
+            } else {
+                const script = document.createElement('script');
+                script.src = 'https://www.tiktok.com/embed.js';
+                script.async = true;
+                document.body.appendChild(script);
+            }
+
+            setEmbedLoading(false);
+        }
+    }, [video?.id, video?.platform, video?.url]);
+
+    // 임베드 URL 생성 (YouTube용)
     const getEmbedUrl = () => {
         if (!video?.url) return null;
 
@@ -103,6 +148,7 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
     };
 
     const embedUrl = getEmbedUrl();
+    const isTikTok = video?.platform === 'tiktok';
 
     if (!video) return null;
 
@@ -144,8 +190,18 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                         {/* 좌측: 영상 정보 */}
                         <div className="md:w-3/5 p-3 sm:p-6 border-b md:border-b-0 md:border-r border-gray-100">
                             {/* 임베드 또는 썸네일 */}
-                            <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden relative">
-                                {embedUrl && !embedFailed ? (
+                            <div className={`${isTikTok ? 'min-h-[400px]' : 'aspect-video'} bg-gray-100 rounded-lg overflow-hidden relative`}>
+                                {/* TikTok 임베드 */}
+                                {isTikTok ? (
+                                    <div
+                                        ref={tiktokContainerRef}
+                                        className="w-full h-full flex items-center justify-center"
+                                        style={{ minHeight: '400px' }}
+                                    >
+                                        {/* 로딩 중 표시 */}
+                                        <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary-500 border-t-transparent"></div>
+                                    </div>
+                                ) : embedUrl && !embedFailed ? (
                                     <>
                                         {/* 로딩 중 썸네일 표시 */}
                                         {embedLoading && video.thumbnail && (
@@ -192,12 +248,10 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                                         <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-3">
                                             <button
                                                 onClick={openOriginalLink}
-                                                className="flex items-center gap-2 px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-full font-medium transition-all transform hover:scale-105 shadow-lg"
+                                                className={`flex items-center gap-2 px-5 py-3 ${video.platform === 'tiktok' ? 'bg-black hover:bg-gray-800' : 'bg-red-600 hover:bg-red-700'} text-white rounded-full font-medium transition-all transform hover:scale-105 shadow-lg`}
                                             >
-                                                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                                                    <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
-                                                </svg>
-                                                YouTube에서 보기
+                                                <PlatformIcon className="w-6 h-6" />
+                                                {getPlatformName(video.platform)}에서 보기
                                             </button>
                                             {embedFailed && (
                                                 <p className="text-white/80 text-sm">임베드가 차단된 영상입니다</p>
