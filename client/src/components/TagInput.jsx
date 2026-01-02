@@ -1,13 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { tagsApi } from '../utils/api';
 
-const TagInput = ({ tags = [], onChange, channelId = null }) => {
+const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = true }) => {
     const [inputValue, setInputValue] = useState('');
     const [suggestions, setSuggestions] = useState([]);
     const [recommendations, setRecommendations] = useState([]);
+    const [categorizedTags, setCategorizedTags] = useState([]);
+    const [expandedCategories, setExpandedCategories] = useState({});
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [showCategoryPanel, setShowCategoryPanel] = useState(false);
     const inputRef = useRef(null);
     const suggestionsRef = useRef(null);
+
+    // 카테고리별 태그 가져오기
+    useEffect(() => {
+        if (showCategoryPicker) {
+            tagsApi.getByCategory()
+                .then(res => {
+                    setCategorizedTags(res.data.categorizedTags || []);
+                    // 첫 번째 카테고리는 기본 펼침
+                    const initial = {};
+                    if (res.data.categorizedTags?.length > 0) {
+                        initial[res.data.categorizedTags[0].id || 'uncategorized'] = true;
+                    }
+                    setExpandedCategories(initial);
+                })
+                .catch(() => setCategorizedTags([]));
+        }
+    }, [showCategoryPicker]);
 
     // 채널별 추천 태그 가져오기
     useEffect(() => {
@@ -74,6 +94,13 @@ const TagInput = ({ tags = [], onChange, channelId = null }) => {
         }
     };
 
+    const toggleCategory = (categoryId) => {
+        setExpandedCategories(prev => ({
+            ...prev,
+            [categoryId || 'uncategorized']: !prev[categoryId || 'uncategorized']
+        }));
+    };
+
     const filteredRecommendations = recommendations.filter(r => !tags.includes(r));
 
     return (
@@ -108,9 +135,23 @@ const TagInput = ({ tags = [], onChange, channelId = null }) => {
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={handleKeyDown}
                         onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                        placeholder={tags.length === 0 ? "태그 입력..." : ""}
+                        placeholder={tags.length === 0 ? "태그 입력... (Enter로 추가)" : ""}
                         className="flex-1 min-w-[100px] text-sm focus:outline-none"
                     />
+
+                    {/* 카테고리 선택 버튼 */}
+                    {showCategoryPicker && (
+                        <button
+                            type="button"
+                            onClick={() => setShowCategoryPanel(!showCategoryPanel)}
+                            className={`p-1 rounded transition-colors ${showCategoryPanel ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+                            title="카테고리에서 태그 선택"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            </svg>
+                        </button>
+                    )}
                 </div>
 
                 {/* 자동완성 드롭다운 */}
@@ -132,6 +173,84 @@ const TagInput = ({ tags = [], onChange, channelId = null }) => {
                     </div>
                 )}
             </div>
+
+            {/* 카테고리별 태그 패널 */}
+            {showCategoryPanel && categorizedTags.length > 0 && (
+                <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden">
+                    <div className="p-2 bg-gray-100 border-b border-gray-200">
+                        <span className="text-xs font-medium text-gray-600">카테고리별 태그 (클릭하여 추가)</span>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto">
+                        {categorizedTags.map((category) => {
+                            const categoryKey = category.id || 'uncategorized';
+                            const isExpanded = expandedCategories[categoryKey];
+                            const availableTags = category.tags?.filter(t => !tags.includes(t.name)) || [];
+
+                            return (
+                                <div key={categoryKey} className="border-b border-gray-200 last:border-b-0">
+                                    {/* 카테고리 헤더 */}
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleCategory(category.id)}
+                                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-100 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <span
+                                                className="w-3 h-3 rounded-full"
+                                                style={{ backgroundColor: category.color }}
+                                            />
+                                            <span className="text-sm font-medium text-gray-700">
+                                                {category.name}
+                                            </span>
+                                            <span className="text-xs text-gray-400">
+                                                ({availableTags.length})
+                                            </span>
+                                        </div>
+                                        <svg
+                                            className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                        >
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
+
+                                    {/* 태그 목록 */}
+                                    {isExpanded && availableTags.length > 0 && (
+                                        <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+                                            {availableTags.map((tag) => (
+                                                <button
+                                                    key={tag.id}
+                                                    type="button"
+                                                    onClick={() => addTag(tag.name)}
+                                                    className="px-2 py-0.5 text-xs rounded transition-colors hover:opacity-80"
+                                                    style={{
+                                                        backgroundColor: `${category.color}20`,
+                                                        color: category.color,
+                                                        border: `1px solid ${category.color}40`
+                                                    }}
+                                                >
+                                                    #{tag.name}
+                                                    {tag.count > 0 && (
+                                                        <span className="ml-1 opacity-60">({tag.count})</span>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {isExpanded && availableTags.length === 0 && (
+                                        <div className="px-3 pb-2 text-xs text-gray-400">
+                                            사용 가능한 태그가 없습니다
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* 추천 태그 */}
             {filteredRecommendations.length > 0 && (

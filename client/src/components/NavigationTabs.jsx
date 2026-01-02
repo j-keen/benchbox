@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import TagManagerModal from './TagManagerModal';
 
 const NavigationTabs = () => {
     const location = useLocation();
     const currentPath = location.pathname;
+    const [showTagManager, setShowTagManager] = useState(false);
 
     const tabs = [
         {
@@ -36,33 +38,55 @@ const NavigationTabs = () => {
     ];
 
     return (
-        <nav className="bg-white border-b border-gray-100">
-            <div className="max-w-7xl mx-auto px-4">
-                <div className="flex items-center justify-around sm:justify-start sm:gap-1">
-                    {tabs.map(tab => {
-                        const isActive = currentPath === tab.path;
+        <>
+            <nav className="bg-white border-b border-gray-100">
+                <div className="max-w-7xl mx-auto px-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-around sm:justify-start sm:gap-1 flex-1">
+                            {tabs.map(tab => {
+                                const isActive = currentPath === tab.path;
 
-                        return (
-                            <Link
-                                key={tab.path}
-                                to={tab.path}
-                                className={`
-                                    flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium
-                                    border-b-2 transition-colors min-h-[48px]
-                                    ${isActive
-                                        ? 'border-primary-500 text-primary-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                    }
-                                `}
-                            >
-                                {tab.icon}
-                                {tab.label}
-                            </Link>
-                        );
-                    })}
+                                return (
+                                    <Link
+                                        key={tab.path}
+                                        to={tab.path}
+                                        className={`
+                                            flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium
+                                            border-b-2 transition-colors min-h-[48px]
+                                            ${isActive
+                                                ? 'border-primary-500 text-primary-600'
+                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                            }
+                                        `}
+                                    >
+                                        {tab.icon}
+                                        {tab.label}
+                                    </Link>
+                                );
+                            })}
+                        </div>
+
+                        {/* 태그 관리 버튼 */}
+                        <button
+                            onClick={() => setShowTagManager(true)}
+                            className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm text-gray-500 hover:text-primary-600 hover:bg-gray-50 rounded-lg transition-colors"
+                            title="태그 관리"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            </svg>
+                            <span className="hidden sm:inline">태그 관리</span>
+                        </button>
+                    </div>
                 </div>
-            </div>
-        </nav>
+            </nav>
+
+            {/* 태그 관리 모달 */}
+            <TagManagerModal
+                isOpen={showTagManager}
+                onClose={() => setShowTagManager(false)}
+            />
+        </>
     );
 };
 

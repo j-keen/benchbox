@@ -628,10 +628,87 @@ export const foldersApi = {
     }
 };
 
+// 태그 카테고리 API
+export const tagCategoriesApi = {
+    getAll: async () => {
+        const { data: categories, error } = await supabase
+            .from('tag_categories')
+            .select('*')
+            .order('sort_order', { ascending: true });
+
+        if (error) throw error;
+        return { data: { categories: categories || [] } };
+    },
+
+    create: async (data) => {
+        const { name, color = '#6366f1', icon = null } = data;
+
+        // 최대 sort_order 가져오기
+        const { data: maxOrder } = await supabase
+            .from('tag_categories')
+            .select('sort_order')
+            .order('sort_order', { ascending: false })
+            .limit(1)
+            .single();
+
+        const sortOrder = (maxOrder?.sort_order || 0) + 1;
+
+        const { data: category, error } = await supabase
+            .from('tag_categories')
+            .insert({ name, color, icon, sort_order: sortOrder })
+            .select()
+            .single();
+
+        if (error) throw error;
+        return { data: category };
+    },
+
+    update: async (id, data) => {
+        const { name, color, icon, sort_order } = data;
+        const updates = { updated_at: new Date().toISOString() };
+        if (name !== undefined) updates.name = name;
+        if (color !== undefined) updates.color = color;
+        if (icon !== undefined) updates.icon = icon;
+        if (sort_order !== undefined) updates.sort_order = sort_order;
+
+        const { data: category, error } = await supabase
+            .from('tag_categories')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return { data: category };
+    },
+
+    delete: async (id) => {
+        const { error } = await supabase
+            .from('tag_categories')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+        return { data: { message: '카테고리가 삭제되었습니다.' } };
+    },
+
+    reorder: async (categoryIds) => {
+        for (let i = 0; i < categoryIds.length; i++) {
+            await supabase
+                .from('tag_categories')
+                .update({ sort_order: i })
+                .eq('id', categoryIds[i]);
+        }
+        return { data: { message: '순서가 변경되었습니다.' } };
+    }
+};
+
 // 태그 API
 export const tagsApi = {
     getAll: async () => {
-        const { data: tags, error } = await supabase.from('tags').select('*');
+        const { data: tags, error } = await supabase
+            .from('tags')
+            .select('*, tag_categories(id, name, color)');
         if (error) throw error;
 
         const tagsWithCount = await Promise.all(tags.map(async (tag) => {
@@ -645,11 +722,71 @@ export const tagsApi = {
                 .select('*', { count: 'exact', head: true })
                 .eq('tag_id', tag.id);
 
-            return { ...tag, count: (videoCount || 0) + (channelCount || 0) };
+            return {
+                ...tag,
+                count: (videoCount || 0) + (channelCount || 0),
+                category: tag.tag_categories || null
+            };
         }));
 
         tagsWithCount.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
         return { data: { tags: tagsWithCount } };
+    },
+
+    // 카테고리별 태그 조회
+    getByCategory: async () => {
+        // 모든 카테고리 가져오기
+        const { data: categories } = await supabase
+            .from('tag_categories')
+            .select('*')
+            .order('sort_order', { ascending: true });
+
+        // 모든 태그 가져오기
+        const { data: tags } = await supabase
+            .from('tags')
+            .select('*')
+            .order('name', { ascending: true });
+
+        // 태그별 사용 횟수
+        const tagsWithCount = await Promise.all((tags || []).map(async (tag) => {
+            const { count: videoCount } = await supabase
+                .from('video_tags')
+                .select('*', { count: 'exact', head: true })
+                .eq('tag_id', tag.id);
+            return { ...tag, count: videoCount || 0 };
+        }));
+
+        // 카테고리별로 그룹화
+        const result = (categories || []).map(cat => ({
+            ...cat,
+            tags: tagsWithCount.filter(t => t.category_id === cat.id)
+        }));
+
+        // 미분류 태그
+        const uncategorized = tagsWithCount.filter(t => !t.category_id);
+        if (uncategorized.length > 0) {
+            result.push({
+                id: null,
+                name: '미분류',
+                color: '#9ca3af',
+                tags: uncategorized
+            });
+        }
+
+        return { data: { categorizedTags: result } };
+    },
+
+    // 태그 카테고리 변경
+    updateCategory: async (tagId, categoryId) => {
+        const { data, error } = await supabase
+            .from('tags')
+            .update({ category_id: categoryId || null })
+            .eq('id', tagId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return { data };
     },
 
     autocomplete: async (q) => {
@@ -798,4 +935,4 @@ export const parseUrlApi = {
     }
 };
 
-export default { videosApi, channelsApi, foldersApi, tagsApi, parseUrlApi };
+export default { videosApi, channelsApi, foldersApi, tagsApi, tagCategoriesApi, parseUrlApi };
