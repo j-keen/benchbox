@@ -139,17 +139,18 @@ const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = 
                         className="flex-1 min-w-[100px] text-sm focus:outline-none"
                     />
 
-                    {/* 카테고리 선택 버튼 */}
+                    {/* 카테고리 선택 버튼 - 모바일 터치 친화적 */}
                     {showCategoryPicker && (
                         <button
                             type="button"
                             onClick={() => setShowCategoryPanel(!showCategoryPanel)}
-                            className={`p-1 rounded transition-colors ${showCategoryPanel ? 'bg-primary-100 text-primary-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+                            className={`flex items-center gap-1.5 px-3 py-2 sm:px-2 sm:py-1.5 rounded-lg transition-colors min-h-[44px] sm:min-h-0 flex-shrink-0 ${showCategoryPanel ? 'bg-primary-500 text-white' : 'bg-primary-50 text-primary-600 hover:bg-primary-100'}`}
                             title="카테고리에서 태그 선택"
                         >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                             </svg>
+                            <span className="text-xs font-medium">카테고리</span>
                         </button>
                     )}
                 </div>
@@ -174,13 +175,22 @@ const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = 
                 )}
             </div>
 
-            {/* 카테고리별 태그 패널 */}
+            {/* 카테고리별 태그 패널 - 모바일 최적화 */}
             {showCategoryPanel && categorizedTags.length > 0 && (
                 <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden">
-                    <div className="p-2 bg-gray-100 border-b border-gray-200">
-                        <span className="text-xs font-medium text-gray-600">카테고리별 태그 (클릭하여 추가)</span>
+                    <div className="p-3 sm:p-2 bg-gray-100 border-b border-gray-200 flex items-center justify-between">
+                        <span className="text-sm sm:text-xs font-medium text-gray-600">카테고리별 태그 (탭하여 추가)</span>
+                        <button
+                            type="button"
+                            onClick={() => setShowCategoryPanel(false)}
+                            className="p-1.5 text-gray-400 hover:text-gray-600 rounded sm:hidden"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
                     </div>
-                    <div className="max-h-60 overflow-y-auto">
+                    <div className="max-h-72 sm:max-h-60 overflow-y-auto">
                         {categorizedTags.map((category) => {
                             const categoryKey = category.id || 'uncategorized';
                             const isExpanded = expandedCategories[categoryKey];
@@ -188,26 +198,26 @@ const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = 
 
                             return (
                                 <div key={categoryKey} className="border-b border-gray-200 last:border-b-0">
-                                    {/* 카테고리 헤더 */}
+                                    {/* 카테고리 헤더 - 터치 영역 확대 */}
                                     <button
                                         type="button"
                                         onClick={() => toggleCategory(category.id)}
-                                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-100 transition-colors"
+                                        className="w-full flex items-center justify-between px-3 py-3 sm:py-2 hover:bg-gray-100 transition-colors min-h-[48px] sm:min-h-0"
                                     >
                                         <div className="flex items-center gap-2">
                                             <span
-                                                className="w-3 h-3 rounded-full"
+                                                className="w-4 h-4 sm:w-3 sm:h-3 rounded-full flex-shrink-0"
                                                 style={{ backgroundColor: category.color }}
                                             />
-                                            <span className="text-sm font-medium text-gray-700">
+                                            <span className="text-base sm:text-sm font-medium text-gray-700">
                                                 {category.name}
                                             </span>
-                                            <span className="text-xs text-gray-400">
+                                            <span className="text-sm sm:text-xs text-gray-400">
                                                 ({availableTags.length})
                                             </span>
                                         </div>
                                         <svg
-                                            className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                            className={`w-5 h-5 sm:w-4 sm:h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                                             fill="none"
                                             viewBox="0 0 24 24"
                                             stroke="currentColor"
@@ -216,15 +226,15 @@ const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = 
                                         </svg>
                                     </button>
 
-                                    {/* 태그 목록 */}
+                                    {/* 태그 목록 - 터치 친화적 크기 */}
                                     {isExpanded && availableTags.length > 0 && (
-                                        <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+                                        <div className="px-3 pb-3 sm:pb-2 flex flex-wrap gap-2 sm:gap-1.5">
                                             {availableTags.map((tag) => (
                                                 <button
                                                     key={tag.id}
                                                     type="button"
                                                     onClick={() => addTag(tag.name)}
-                                                    className="px-2 py-0.5 text-xs rounded transition-colors hover:opacity-80"
+                                                    className="px-3 py-2 sm:px-2 sm:py-1 text-sm sm:text-xs rounded-lg sm:rounded transition-colors hover:opacity-80 min-h-[40px] sm:min-h-0"
                                                     style={{
                                                         backgroundColor: `${category.color}20`,
                                                         color: category.color,
@@ -241,7 +251,7 @@ const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = 
                                     )}
 
                                     {isExpanded && availableTags.length === 0 && (
-                                        <div className="px-3 pb-2 text-xs text-gray-400">
+                                        <div className="px-3 pb-3 sm:pb-2 text-sm sm:text-xs text-gray-400">
                                             사용 가능한 태그가 없습니다
                                         </div>
                                     )}
@@ -252,17 +262,17 @@ const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = 
                 </div>
             )}
 
-            {/* 추천 태그 */}
+            {/* 추천 태그 - 모바일 터치 친화적 */}
             {filteredRecommendations.length > 0 && (
                 <div>
-                    <div className="text-xs text-gray-500 mb-1.5">추천 태그</div>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="text-sm sm:text-xs text-gray-500 mb-2 sm:mb-1.5">추천 태그</div>
+                    <div className="flex flex-wrap gap-2 sm:gap-1.5">
                         {filteredRecommendations.map((tag, index) => (
                             <button
                                 key={index}
                                 type="button"
                                 onClick={() => addTag(tag)}
-                                className="px-2 py-0.5 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                                className="px-3 py-2 sm:px-2 sm:py-1 text-sm sm:text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg sm:rounded transition-colors min-h-[40px] sm:min-h-0"
                             >
                                 #{tag}
                             </button>

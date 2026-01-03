@@ -550,7 +550,7 @@ const Home = () => {
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="제목, 메모, 태그 검색... (Ctrl+K)"
+                                    placeholder="전체 영상에서 검색... (Ctrl+K)"
                                     className="w-full sm:w-64 pl-9 pr-3 py-2.5 sm:py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                 />
                                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

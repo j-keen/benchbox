@@ -36,6 +36,7 @@ const FolderDetail = () => {
     // 필터 상태
     const [filterChannelId, setFilterChannelId] = useState(null); // null = 전체
     const [sortBy, setSortBy] = useState('newest');
+    const [searchQuery, setSearchQuery] = useState('');
 
     // 선택 모드 토글
     useEffect(() => {
@@ -242,11 +243,22 @@ const FolderDetail = () => {
     useGlobalPaste(handleGlobalPaste);
 
     // 필터링된 영상
-    const filteredVideos = filterChannelId === 'folder'
-        ? videos.filter(v => v.source_type === 'folder')  // 폴더 직접 저장 영상만
-        : filterChannelId
-            ? videos.filter(v => v.channel_id === filterChannelId)
-            : videos;
+    const filteredVideos = videos.filter(v => {
+        // 채널/폴더 필터
+        if (filterChannelId === 'folder' && v.source_type !== 'folder') return false;
+        if (filterChannelId && filterChannelId !== 'folder' && v.channel_id !== filterChannelId) return false;
+
+        // 검색 필터
+        if (searchQuery) {
+            const query = searchQuery.replace(/^#/, '').toLowerCase();
+            const titleMatch = v.title?.toLowerCase().includes(query);
+            const memoMatch = v.memo?.toLowerCase().includes(query);
+            const tagMatch = v.tags?.some(tag => tag.toLowerCase().includes(query));
+            if (!titleMatch && !memoMatch && !tagMatch) return false;
+        }
+
+        return true;
+    });
 
     // 정렬된 영상
     const sortedVideos = [...filteredVideos].sort((a, b) => {
@@ -459,21 +471,47 @@ const FolderDetail = () => {
 
                 {/* 영상 섹션 */}
                 <section>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-                        <h2 className="text-lg font-semibold text-gray-900">
-                            영상 ({filteredVideos.length})
-                        </h2>
+                    <div className="flex flex-col gap-3 mb-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <h2 className="text-lg font-semibold text-gray-900">
+                                영상 ({filteredVideos.length})
+                            </h2>
 
-                        <div className="flex items-center gap-3">
-                            <select
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value)}
-                                className="text-sm border border-gray-200 rounded-lg px-3 py-2 sm:py-1.5 min-h-[44px] sm:min-h-0 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                            >
-                                <option value="newest">최신순</option>
-                                <option value="oldest">오래된순</option>
-                                <option value="title">제목순</option>
-                            </select>
+                            <div className="flex items-center gap-3">
+                                <select
+                                    value={sortBy}
+                                    onChange={(e) => setSortBy(e.target.value)}
+                                    className="text-sm border border-gray-200 rounded-lg px-3 py-2 sm:py-1.5 min-h-[44px] sm:min-h-0 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                >
+                                    <option value="newest">최신순</option>
+                                    <option value="oldest">오래된순</option>
+                                    <option value="title">제목순</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* 검색창 */}
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="이 폴더에서 검색... (제목, 메모, 태그)"
+                                className="w-full pl-9 pr-8 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            />
+                            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
                         </div>
                     </div>
 
