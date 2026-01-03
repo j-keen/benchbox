@@ -5,7 +5,7 @@
     { "source": "/(.*)", "destination": "/" }
   ],
   "functions": {
-    "client/api/parse-url.js": {
+    "api/parse-url.js": {
       "maxDuration": 30
     }
   }
