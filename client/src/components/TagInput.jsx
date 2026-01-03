@@ -107,7 +107,27 @@ const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = 
         <div className="space-y-3">
             {/* 태그 입력 영역 */}
             <div className="relative">
-                <div className="flex flex-wrap gap-1.5 p-2 bg-white border border-gray-200 rounded-lg focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent min-h-[42px]">
+                {/* 카테고리 버튼 - 항상 상단에 표시 */}
+                {showCategoryPicker && (
+                    <div className="mb-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowCategoryPanel(!showCategoryPanel)}
+                            className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-colors ${showCategoryPanel ? 'bg-primary-500 text-white' : 'bg-primary-50 text-primary-600 hover:bg-primary-100 border border-primary-200'}`}
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            </svg>
+                            <span className="text-sm font-medium">카테고리에서 태그 선택</span>
+                            <svg className={`w-4 h-4 transition-transform ${showCategoryPanel ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                    </div>
+                )}
+
+                {/* 태그 입력 박스 */}
+                <div className="flex flex-wrap items-center gap-1.5 p-2 bg-white border border-gray-200 rounded-lg focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent min-h-[42px]">
                     {/* 기존 태그들 */}
                     {tags.map((tag, index) => (
                         <span
@@ -138,21 +158,6 @@ const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = 
                         placeholder={tags.length === 0 ? "태그 입력... (Enter로 추가)" : ""}
                         className="flex-1 min-w-[100px] text-sm focus:outline-none"
                     />
-
-                    {/* 카테고리 선택 버튼 - 모바일 터치 친화적 */}
-                    {showCategoryPicker && (
-                        <button
-                            type="button"
-                            onClick={() => setShowCategoryPanel(!showCategoryPanel)}
-                            className={`flex items-center gap-1.5 px-3 py-2 sm:px-2 sm:py-1.5 rounded-lg transition-colors min-h-[44px] sm:min-h-0 flex-shrink-0 ${showCategoryPanel ? 'bg-primary-500 text-white' : 'bg-primary-50 text-primary-600 hover:bg-primary-100'}`}
-                            title="카테고리에서 태그 선택"
-                        >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                            </svg>
-                            <span className="text-xs font-medium">카테고리</span>
-                        </button>
-                    )}
                 </div>
 
                 {/* 자동완성 드롭다운 */}

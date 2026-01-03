@@ -89,19 +89,18 @@ const UrlInput = ({ onSave, currentChannelId = null, channels = [] }) => {
                         placeholder="URL 붙여넣기..."
                         className="flex-1 pl-3 pr-3 py-3 text-gray-900 placeholder-gray-400 focus:outline-none"
                     />
-                    {loading ? (
-                        <div className="pr-4">
-                            <div className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
-                        </div>
-                    ) : url && !preview ? (
+                    {/* 항상 보이는 추가 버튼 */}
+                    {url && !preview && (
                         <button
                             onClick={() => handlePaste({ target: { value: url } })}
-                            className="mr-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium rounded-lg transition-colors min-h-[44px] flex-shrink-0"
+                            disabled={loading}
+                            className="mr-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 disabled:bg-primary-300 text-white text-sm font-medium rounded-lg transition-colors min-h-[44px] flex-shrink-0 flex items-center gap-2"
                         >
+                            {loading && (
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            )}
                             추가
                         </button>
-                    ) : !url && (
-                        <span className="pr-4 text-xs text-gray-400 hidden sm:block">Enter로 추가</span>
                     )}
                 </div>
             </div>
