@@ -1,5 +1,5 @@
 const SUPABASE_URL = 'https://pawwbhmaenjnsxptomtg.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhd3diaG1hZW5qbnN4cHRvbXRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgyNDE2MTgsImV4cCI6MjA2MzgxNzYxOH0.n5zXW8WReVH0bshgxOm-C82F2hqNfLlgXJpE0kxeYnc';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhd3diaG1hZW5qbnN4cHRvbXRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNDkzODksImV4cCI6MjA4MjcyNTM4OX0.n6jYdtH4eKnPHq5sb-e7Gtuw16Oi1L3EMoKBcgF_SeM';
 
 export default async function handler(req, res) {
     // CORS
