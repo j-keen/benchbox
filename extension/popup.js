@@ -8,6 +8,7 @@ let state = {
   serverUrl: '',
   currentUrl: '',
   urlInfo: null,
+  metadata: null, // 썸네일, 제목 등
   saveType: 'video', // 'video' | 'channel'
   folders: [],
   channels: [],
@@ -79,6 +80,11 @@ function setupEventListeners() {
 
   // 설정 버튼
   document.getElementById('settingsBtn').addEventListener('click', () => showView('setup'));
+
+  // 새 폴더 버튼
+  document.getElementById('newFolderBtn').addEventListener('click', showNewFolderInput);
+  document.getElementById('createFolderBtn').addEventListener('click', createFolder);
+  document.getElementById('cancelFolderBtn').addEventListener('click', hideNewFolderInput);
 }
 
 // URL 파싱
@@ -181,14 +187,19 @@ async function saveServerUrl() {
 // 데이터 로드 및 메인 화면 표시
 async function loadDataAndShowMain() {
   try {
-    // 폴더와 채널 목록 로드
-    const [foldersRes, channelsRes] = await Promise.all([
+    // 폴더, 채널 목록, 메타데이터 동시 로드
+    const [foldersRes, channelsRes, metadataRes] = await Promise.all([
       fetchApi('/api/folders'),
-      fetchApi('/api/channels')
+      fetchApi('/api/channels'),
+      fetchApi('/api/parse-url', {
+        method: 'POST',
+        body: JSON.stringify({ url: state.currentUrl })
+      }).catch(() => null)
     ]);
 
     state.folders = foldersRes.folders || [];
     state.channels = channelsRes.channels || [];
+    state.metadata = metadataRes;
 
     // UI 업데이트
     updateMainView();
@@ -207,23 +218,25 @@ function updateMainView() {
   badge.textContent = state.urlInfo.type === 'channel' ? '채널' : '영상';
   badge.classList.toggle('channel', state.urlInfo.type === 'channel');
 
-  // 썸네일 & 제목 (실제로는 메타데이터 파싱 필요)
-  document.getElementById('thumbnail').src = '';
-  document.getElementById('title').textContent = state.currentUrl;
+  // 썸네일 & 제목
+  const thumbnailEl = document.getElementById('thumbnail');
+  const titleEl = document.getElementById('title');
+
+  if (state.metadata) {
+    thumbnailEl.src = state.metadata.thumbnail || '';
+    titleEl.textContent = state.metadata.title || state.currentUrl;
+  } else {
+    thumbnailEl.src = '';
+    titleEl.textContent = state.currentUrl;
+  }
+
   document.getElementById('platform').textContent = state.urlInfo.platform;
 
   // 저장 타입 설정
   setType(state.urlInfo.type);
 
   // 폴더 셀렉트 채우기
-  const folderSelect = document.getElementById('folderSelect');
-  folderSelect.innerHTML = '<option value="">폴더 없음</option>';
-  state.folders.forEach(folder => {
-    const option = document.createElement('option');
-    option.value = folder.id;
-    option.textContent = folder.name;
-    folderSelect.appendChild(option);
-  });
+  updateFolderSelect();
 
   // 채널 셀렉트 채우기
   const channelSelect = document.getElementById('channelSelect');
@@ -236,6 +249,23 @@ function updateMainView() {
   });
 }
 
+// 폴더 셀렉트 업데이트
+function updateFolderSelect() {
+  const folderSelect = document.getElementById('folderSelect');
+  const currentValue = state.selectedFolder;
+
+  folderSelect.innerHTML = '<option value="">폴더 없음</option>';
+  state.folders.forEach(folder => {
+    const option = document.createElement('option');
+    option.value = folder.id;
+    option.textContent = folder.name;
+    if (folder.id == currentValue) {
+      option.selected = true;
+    }
+    folderSelect.appendChild(option);
+  });
+}
+
 // 저장 타입 설정
 function setType(type) {
   state.saveType = type;
@@ -245,6 +275,49 @@ function setType(type) {
 
   // 채널 선택은 영상일 때만 표시
   document.getElementById('channelGroup').classList.toggle('hidden', type === 'channel');
+}
+
+// 새 폴더 입력 표시
+function showNewFolderInput() {
+  document.getElementById('newFolderInput').classList.remove('hidden');
+  document.getElementById('newFolderName').focus();
+}
+
+// 새 폴더 입력 숨기기
+function hideNewFolderInput() {
+  document.getElementById('newFolderInput').classList.add('hidden');
+  document.getElementById('newFolderName').value = '';
+}
+
+// 폴더 생성
+async function createFolder() {
+  const nameInput = document.getElementById('newFolderName');
+  const name = nameInput.value.trim();
+
+  if (!name) {
+    alert('폴더 이름을 입력해주세요');
+    return;
+  }
+
+  try {
+    const result = await fetchApi('/api/folders', {
+      method: 'POST',
+      body: JSON.stringify({ name })
+    });
+
+    // 새 폴더를 목록에 추가
+    if (result.id) {
+      state.folders.push(result);
+      state.selectedFolder = result.id;
+      updateFolderSelect();
+      document.getElementById('folderSelect').value = result.id;
+    }
+
+    hideNewFolderInput();
+  } catch (error) {
+    console.error('폴더 생성 오류:', error);
+    alert('폴더 생성에 실패했습니다');
+  }
 }
 
 // 저장 처리
@@ -286,6 +359,13 @@ async function saveChannel() {
     data.folder_id = state.selectedFolder;
   }
 
+  // 메타데이터 추가
+  if (state.metadata) {
+    data.title = state.metadata.title;
+    data.thumbnail = state.metadata.thumbnail;
+    data.description = state.metadata.description;
+  }
+
   await fetchApi('/api/channels', {
     method: 'POST',
     body: JSON.stringify(data)
@@ -304,6 +384,13 @@ async function saveVideo() {
 
   if (state.selectedFolder) {
     data.folder_id = state.selectedFolder;
+  }
+
+  // 메타데이터 추가
+  if (state.metadata) {
+    data.title = state.metadata.title;
+    data.thumbnail = state.metadata.thumbnail;
+    data.description = state.metadata.description;
   }
 
   await fetchApi('/api/videos', {

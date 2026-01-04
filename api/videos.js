@@ -60,7 +60,7 @@ export default async function handler(req, res) {
     // POST: 영상 저장
     if (req.method === 'POST') {
         try {
-            const { url, channel_id, folder_id } = req.body;
+            const { url, channel_id, folder_id, title, thumbnail, description } = req.body;
 
             if (!url) {
                 return res.status(400).json({ error: 'URL이 필요합니다.' });
@@ -87,7 +87,9 @@ export default async function handler(req, res) {
                         url,
                         platform: urlInfo.platform,
                         video_type: urlInfo.videoType,
-                        title: url,
+                        title: title || url,
+                        thumbnail: thumbnail || null,
+                        description: description || null,
                         channel_id: channel_id || null,
                         folder_id: folder_id || null
                     })

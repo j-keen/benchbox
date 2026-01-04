@@ -55,7 +55,7 @@ export default async function handler(req, res) {
     // POST: 채널 생성
     if (req.method === 'POST') {
         try {
-            const { url, folder_id } = req.body;
+            const { url, folder_id, title, thumbnail, description } = req.body;
 
             if (!url) {
                 return res.status(400).json({ error: 'URL이 필요합니다.' });
@@ -81,7 +81,9 @@ export default async function handler(req, res) {
                     body: JSON.stringify({
                         url,
                         platform: urlInfo.platform,
-                        title: url,
+                        title: title || url,
+                        thumbnail: thumbnail || null,
+                        description: description || null,
                         folder_id: folder_id || null
                     })
                 }
