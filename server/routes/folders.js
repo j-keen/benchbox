@@ -91,20 +91,26 @@ router.get('/:id', async (req, res) => {
             }));
         }
 
-        // 폴더에 직접 저장된 영상들
+        // 폴더에 직접 저장된 영상들 (channel_id 유무 상관없이)
         const { data: folderVideos } = await supabase
             .from('videos')
-            .select('*')
+            .select(`
+                *,
+                channels(title, thumbnail)
+            `)
             .eq('folder_id', id)
-            .is('channel_id', null)
             .order('created_at', { ascending: false });
 
-        const directVideos = (folderVideos || []).map(v => ({
-            ...v,
-            channel_title: null,
-            channel_thumbnail: null,
-            source_type: 'folder'
-        }));
+        // 채널 영상과 중복되지 않는 폴더 직접 저장 영상만 추가
+        const channelVideoIds = new Set(channelVideos.map(v => v.id));
+        const directVideos = (folderVideos || [])
+            .filter(v => !channelVideoIds.has(v.id)) // 중복 제거
+            .map(v => ({
+                ...v,
+                channel_title: v.channels?.title || null,
+                channel_thumbnail: v.channels?.thumbnail || null,
+                source_type: v.channel_id ? 'channel' : 'folder'
+            }));
 
         // 모든 영상 합치기
         const allVideos = [...channelVideos, ...directVideos].sort(

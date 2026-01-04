@@ -231,8 +231,21 @@ router.put('/:id', async (req, res) => {
         // 업데이트할 필드 준비
         const updates = { updated_at: new Date().toISOString() };
         if (memo !== undefined) updates.memo = memo;
-        if (channel_id !== undefined) updates.channel_id = channel_id || null;
-        if (folder_id !== undefined) updates.folder_id = folder_id || null;
+
+        // channel_id와 folder_id는 상호 배타적
+        // 채널에 저장하면 폴더에서 제거, 폴더에 저장하면 채널에서 제거
+        if (channel_id !== undefined) {
+            updates.channel_id = channel_id || null;
+            if (channel_id) {
+                updates.folder_id = null; // 채널에 저장하면 폴더에서 제거
+            }
+        }
+        if (folder_id !== undefined) {
+            updates.folder_id = folder_id || null;
+            if (folder_id) {
+                updates.channel_id = null; // 폴더에 저장하면 채널에서 제거
+            }
+        }
 
         // 업데이트 실행
         await supabase
