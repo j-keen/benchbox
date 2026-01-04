@@ -83,24 +83,82 @@ const Home = () => {
                 channelParams.folder_id = activeFolder;
             }
 
-            const [videosRes, channelsRes, foldersRes, tagsRes] = await Promise.all([
-                videosApi.getAll({
-                    unassigned: showUnassignedOnly || undefined,
+            // 특정 폴더 선택 시 해당 폴더의 영상만 가져오기
+            if (activeFolder !== null && activeFolder !== 'unfiled') {
+                // 폴더 상세 API 사용 (채널 영상 + 직접 저장 영상 모두 포함)
+                const [folderRes, foldersRes, tagsRes] = await Promise.all([
+                    foldersApi.getById(activeFolder),
+                    foldersApi.getAll(),
+                    tagsApi.getAll()
+                ]);
+
+                // 폴더의 영상들 필터링 적용
+                let folderVideos = folderRes.data.videos || [];
+
+                // 플랫폼 필터
+                if (filterPlatform !== 'all') {
+                    folderVideos = folderVideos.filter(v => v.platform === filterPlatform);
+                }
+                // 영상 타입 필터
+                if (filterVideoType !== 'all') {
+                    folderVideos = folderVideos.filter(v => v.video_type === filterVideoType);
+                }
+                // 태그 필터
+                if (filterTag) {
+                    folderVideos = folderVideos.filter(v => v.tags?.includes(filterTag));
+                }
+                // 검색 필터
+                if (searchQuery) {
+                    const query = searchQuery.toLowerCase();
+                    folderVideos = folderVideos.filter(v =>
+                        v.title?.toLowerCase().includes(query) ||
+                        v.memo?.toLowerCase().includes(query) ||
+                        v.tags?.some(t => t.toLowerCase().includes(query))
+                    );
+                }
+                // 정렬
+                if (sortBy === 'oldest') {
+                    folderVideos.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                } else if (sortBy === 'title') {
+                    folderVideos.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                } else {
+                    folderVideos.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                }
+
+                setVideos(folderVideos);
+                setChannels(folderRes.data.channels || []);
+                setFolders(foldersRes.data.folders || []);
+                setAllTags(tagsRes.data.tags || []);
+            } else {
+                // 전체 또는 미분류: 기존 로직
+                const videoParams = {
                     sort: sortBy,
                     platform: filterPlatform !== 'all' ? filterPlatform : undefined,
                     video_type: filterVideoType !== 'all' ? filterVideoType : undefined,
                     tag: filterTag || undefined,
                     search: searchQuery || undefined
-                }),
-                channelsApi.getAll(channelParams),
-                foldersApi.getAll(),
-                tagsApi.getAll()
-            ]);
+                };
 
-            setVideos(videosRes.data.videos || []);
-            setChannels(channelsRes.data.channels || []);
-            setFolders(foldersRes.data.folders || []);
-            setAllTags(tagsRes.data.tags || []);
+                // 미분류 선택 시 channel_id와 folder_id 둘 다 null인 영상만
+                if (activeFolder === 'unfiled') {
+                    videoParams.channel_id = 'null';
+                    videoParams.folder_id = 'null';
+                } else if (showUnassignedOnly) {
+                    videoParams.unassigned = true;
+                }
+
+                const [videosRes, channelsRes, foldersRes, tagsRes] = await Promise.all([
+                    videosApi.getAll(videoParams),
+                    channelsApi.getAll(channelParams),
+                    foldersApi.getAll(),
+                    tagsApi.getAll()
+                ]);
+
+                setVideos(videosRes.data.videos || []);
+                setChannels(channelsRes.data.channels || []);
+                setFolders(foldersRes.data.folders || []);
+                setAllTags(tagsRes.data.tags || []);
+            }
         } catch (error) {
             console.error('데이터 로드 오류:', error);
         } finally {

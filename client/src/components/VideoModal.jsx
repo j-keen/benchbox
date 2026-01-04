@@ -11,6 +11,7 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [embedFailed, setEmbedFailed] = useState(false);
     const [embedLoading, setEmbedLoading] = useState(true);
+    const [isWidescreen, setIsWidescreen] = useState(false); // 기본 9:16, true면 16:9
     const tiktokContainerRef = useRef(null);
 
     const PlatformIcon = getPlatformIcon(video?.platform);
@@ -46,6 +47,7 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
     useEffect(() => {
         setEmbedFailed(false);
         setEmbedLoading(true);
+        setIsWidescreen(false); // 비율도 기본값(9:16)으로 리셋
 
         // 3초 후 로딩 상태 해제 (실패 감지 불가하므로 시간 기반)
         const timer = setTimeout(() => {
@@ -190,7 +192,24 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                         {/* 좌측: 영상 정보 */}
                         <div className="md:w-3/5 p-3 sm:p-6 border-b md:border-b-0 md:border-r border-gray-100">
                             {/* 임베드 또는 썸네일 */}
-                            <div className={`${isTikTok ? 'min-h-[400px]' : 'aspect-video'} bg-gray-100 rounded-lg overflow-hidden relative`}>
+                            <div className={`${isTikTok ? 'min-h-[400px]' : isWidescreen ? 'aspect-video' : 'aspect-[9/16] max-h-[60vh] mx-auto'} bg-gray-100 rounded-lg overflow-hidden relative`}>
+                                {/* 비율 전환 버튼 (TikTok 제외) */}
+                                {!isTikTok && (
+                                    <button
+                                        onClick={() => setIsWidescreen(!isWidescreen)}
+                                        className="absolute top-2 left-2 z-20 px-2 py-1 text-xs bg-black/60 hover:bg-black/80 text-white rounded transition-colors flex items-center gap-1"
+                                        title={isWidescreen ? '세로 비율 (9:16)' : '가로 비율 (16:9)'}
+                                    >
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            {isWidescreen ? (
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10h6m-6 0H3m6-10h6M9 7H3m12 10h6m0-10h-6" />
+                                            ) : (
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                            )}
+                                        </svg>
+                                        {isWidescreen ? '9:16' : '16:9'}
+                                    </button>
+                                )}
                                 {/* TikTok 임베드 */}
                                 {isTikTok ? (
                                     <div
