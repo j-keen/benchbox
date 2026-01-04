@@ -10,6 +10,9 @@
     "build": "cd client && npm install && npm run build",
     "start": "cd server && npm start"
   },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  },
   "devDependencies": {
     "concurrently": "^8.2.2"
   }
