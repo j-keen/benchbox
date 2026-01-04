@@ -51,16 +51,13 @@ const Home = () => {
 
     // 필터 상태
     const [sortBy, setSortBy] = useState('newest');
-    const [filterPlatform, setFilterPlatform] = useState('all');
-    const [filterVideoType, setFilterVideoType] = useState('all');
-    const [filterTag, setFilterTag] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
 
     // 데이터 로드
     useEffect(() => {
         loadData();
-    }, [sortBy, filterPlatform, filterVideoType, filterTag, searchQuery, activeFolder, showUnassignedOnly]);
+    }, [sortBy, searchQuery, activeFolder, showUnassignedOnly]);
 
     // 선택 모드 토글
     useEffect(() => {
@@ -95,18 +92,6 @@ const Home = () => {
                 // 폴더의 영상들 필터링 적용
                 let folderVideos = folderRes.data.videos || [];
 
-                // 플랫폼 필터
-                if (filterPlatform !== 'all') {
-                    folderVideos = folderVideos.filter(v => v.platform === filterPlatform);
-                }
-                // 영상 타입 필터
-                if (filterVideoType !== 'all') {
-                    folderVideos = folderVideos.filter(v => v.video_type === filterVideoType);
-                }
-                // 태그 필터
-                if (filterTag) {
-                    folderVideos = folderVideos.filter(v => v.tags?.includes(filterTag));
-                }
                 // 검색 필터
                 if (searchQuery) {
                     const query = searchQuery.toLowerCase();
@@ -133,9 +118,6 @@ const Home = () => {
                 // 전체 또는 미분류: 기존 로직
                 const videoParams = {
                     sort: sortBy,
-                    platform: filterPlatform !== 'all' ? filterPlatform : undefined,
-                    video_type: filterVideoType !== 'all' ? filterVideoType : undefined,
-                    tag: filterTag || undefined,
                     search: searchQuery || undefined
                 };
 
@@ -334,15 +316,6 @@ const Home = () => {
         setSelectedChannels(new Set());
         setSelectedVideos(new Set());
         setSelectedFolders(new Set());
-    };
-
-    // 전체 선택 (현재 표시되는 항목들)
-    const selectAllVideos = () => {
-        setSelectedVideos(new Set(videos.map(v => v.id)));
-    };
-
-    const selectAllChannels = () => {
-        setSelectedChannels(new Set(channels.map(c => c.id)));
     };
 
     // 전역 URL 붙여넣기 처리
@@ -631,7 +604,7 @@ const Home = () => {
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="전체 영상에서 검색... (Ctrl+K)"
+                                    placeholder={`${getActiveFolderName()}에서 검색... (Ctrl+K)`}
                                     className="w-full sm:w-64 pl-9 pr-3 py-2.5 sm:py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                 />
                                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

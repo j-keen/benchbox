@@ -365,7 +365,6 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                                     <TagInput
                                         tags={tags}
                                         onChange={setTags}
-                                        channelId={video.channel_id}
                                     />
                                 </div>
                             </div>

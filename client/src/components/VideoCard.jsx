@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { getPlatformIcon, getPlatformColor } from '../utils/platformIcons';
 
-const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, draggable = true, showChannelInfo = false }) => {
+const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, draggable = true }) => {
     const [isHovered, setIsHovered] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const PlatformIcon = getPlatformIcon(video.platform);
@@ -189,25 +189,16 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
 
             {/* 정보 */}
             <div className="p-3">
-                {/* 채널 정보 (폴더 상세에서 사용) */}
-                {showChannelInfo && video.channel_title && (
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                        {video.channel_thumbnail && (
-                            <img
-                                src={video.channel_thumbnail}
-                                alt=""
-                                className="w-4 h-4 rounded-full object-cover"
-                            />
-                        )}
-                        <span className="text-xs text-gray-500 truncate">
-                            {video.channel_title}
-                        </span>
-                    </div>
-                )}
-
                 <h3 className="font-medium text-gray-900 line-clamp-2 text-sm leading-5">
                     {video.title || 'Untitled'}
                 </h3>
+
+                {/* 채널명 - 항상 표시 */}
+                {video.channel_title && (
+                    <div className="mt-1 text-xs text-gray-500 truncate">
+                        {video.channel_title}
+                    </div>
+                )}
 
                 {/* 저장일 */}
                 <div className="mt-1 text-xs text-gray-400">

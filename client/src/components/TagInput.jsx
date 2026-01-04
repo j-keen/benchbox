@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { tagsApi } from '../utils/api';
 
-const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = true }) => {
+const TagInput = ({ tags = [], onChange, showCategoryPicker = true }) => {
     const [inputValue, setInputValue] = useState('');
     const [suggestions, setSuggestions] = useState([]);
-    const [recommendations, setRecommendations] = useState([]);
     const [categorizedTags, setCategorizedTags] = useState([]);
     const [expandedCategories, setExpandedCategories] = useState({});
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -29,15 +28,6 @@ const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = 
                 .catch(() => setCategorizedTags([]));
         }
     }, [showCategoryPicker]);
-
-    // 채널별 추천 태그 가져오기
-    useEffect(() => {
-        if (channelId) {
-            tagsApi.recommend(channelId)
-                .then(res => setRecommendations(res.data.recommendations || []))
-                .catch(() => setRecommendations([]));
-        }
-    }, [channelId]);
 
     // 자동완성
     useEffect(() => {
@@ -128,8 +118,6 @@ const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = 
         setPendingTags([]);
         setShowCategoryPanel(false);
     };
-
-    const filteredRecommendations = recommendations.filter(r => !tags.includes(r));
 
     return (
         <div className="space-y-3">
