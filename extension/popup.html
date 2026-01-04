@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BenchBox</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 헤더 -->
+    <header class="header">
+      <h1>BenchBox</h1>
+      <span class="badge" id="urlType">영상</span>
+    </header>
+
+    <!-- 설정 필요 화면 -->
+    <div id="setupView" class="view hidden">
+      <div class="setup-icon">⚙️</div>
+      <p>BenchBox 서버 URL을 설정해주세요</p>
+      <input type="text" id="serverUrlInput" placeholder="예: https://your-server.vercel.app">
+      <button id="saveServerBtn" class="btn btn-primary">저장</button>
+    </div>
+
+    <!-- 지원하지 않는 페이지 -->
+    <div id="unsupportedView" class="view hidden">
+      <div class="unsupported-icon">🚫</div>
+      <p>이 페이지는 저장할 수 없습니다</p>
+      <small>YouTube, TikTok, Instagram에서 사용해주세요</small>
+    </div>
+
+    <!-- 메인 저장 화면 -->
+    <div id="mainView" class="view hidden">
+      <!-- 현재 URL 미리보기 -->
+      <div class="preview">
+        <img id="thumbnail" src="" alt="썸네일" class="thumbnail">
+        <div class="preview-info">
+          <div id="title" class="title">제목 로딩중...</div>
+          <div id="platform" class="platform">YouTube</div>
+        </div>
+      </div>
+
+      <!-- 저장 옵션 -->
+      <div class="options">
+        <!-- 저장 타입 선택 -->
+        <div class="option-group">
+          <label>저장 유형</label>
+          <div class="toggle-buttons">
+            <button id="typeVideo" class="toggle-btn active">영상</button>
+            <button id="typeChannel" class="toggle-btn">채널</button>
+          </div>
+        </div>
+
+        <!-- 폴더 선택 -->
+        <div class="option-group" id="folderGroup">
+          <label>폴더</label>
+          <select id="folderSelect">
+            <option value="">폴더 없음</option>
+          </select>
+        </div>
+
+        <!-- 채널 선택 (영상일 때만) -->
+        <div class="option-group" id="channelGroup">
+          <label>채널에 저장</label>
+          <select id="channelSelect">
+            <option value="">채널 없음 (개별 저장)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 저장 버튼 -->
+      <button id="saveBtn" class="btn btn-primary btn-save">
+        <span class="btn-text">저장하기</span>
+        <span class="btn-loading hidden">저장 중...</span>
+      </button>
+    </div>
+
+    <!-- 저장 완료 화면 -->
+    <div id="successView" class="view hidden">
+      <div class="success-icon">✅</div>
+      <p>저장 완료!</p>
+      <button id="openBenchboxBtn" class="btn btn-secondary">BenchBox 열기</button>
+    </div>
+
+    <!-- 에러 화면 -->
+    <div id="errorView" class="view hidden">
+      <div class="error-icon">❌</div>
+      <p id="errorMessage">저장에 실패했습니다</p>
+      <button id="retryBtn" class="btn btn-secondary">다시 시도</button>
+    </div>
+
+    <!-- 푸터: 설정 -->
+    <footer class="footer">
+      <button id="settingsBtn" class="settings-btn">⚙️ 설정</button>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
