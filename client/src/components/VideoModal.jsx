@@ -12,6 +12,7 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
     const [embedFailed, setEmbedFailed] = useState(false);
     const [embedLoading, setEmbedLoading] = useState(true);
     const [isWidescreen, setIsWidescreen] = useState(false); // 기본 9:16, true면 16:9
+    const [showMemoTags, setShowMemoTags] = useState(false); // 모바일 접기 상태
     const tiktokContainerRef = useRef(null);
 
     const PlatformIcon = getPlatformIcon(video?.platform);
@@ -330,29 +331,43 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
 
                         {/* 우측: 기록 + 태그 */}
                         <div className="md:w-2/5 p-3 sm:p-6 flex flex-col">
-                            {/* 내 기록 */}
-                            <div className="flex-1">
-                                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
-                                    내 기록
-                                </label>
-                                <textarea
-                                    value={memo}
-                                    onChange={(e) => setMemo(e.target.value)}
-                                    placeholder="메모..."
-                                    className="w-full h-24 sm:h-40 p-2.5 sm:p-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                                />
-                            </div>
+                            {/* 모바일: 메모/태그 펼치기 버튼 */}
+                            <button
+                                onClick={() => setShowMemoTags(!showMemoTags)}
+                                className="md:hidden w-full flex items-center justify-between py-2 text-sm text-gray-600"
+                            >
+                                <span className="font-medium">메모 / 태그</span>
+                                <svg className={`w-5 h-5 transition-transform ${showMemoTags ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
 
-                            {/* 해시태그 */}
-                            <div className="mt-3 sm:mt-4">
-                                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
-                                    태그
-                                </label>
-                                <TagInput
-                                    tags={tags}
-                                    onChange={setTags}
-                                    channelId={video.channel_id}
-                                />
+                            {/* 메모/태그 내용 - 모바일에서는 접힘 */}
+                            <div className={`${showMemoTags ? 'block' : 'hidden'} md:block`}>
+                                {/* 내 기록 */}
+                                <div className="flex-1">
+                                    <label className="hidden md:block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                                        내 기록
+                                    </label>
+                                    <textarea
+                                        value={memo}
+                                        onChange={(e) => setMemo(e.target.value)}
+                                        placeholder="메모..."
+                                        className="w-full h-20 sm:h-40 p-2.5 sm:p-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                                    />
+                                </div>
+
+                                {/* 해시태그 */}
+                                <div className="mt-3 sm:mt-4">
+                                    <label className="hidden md:block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                                        태그
+                                    </label>
+                                    <TagInput
+                                        tags={tags}
+                                        onChange={setTags}
+                                        channelId={video.channel_id}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -31,6 +31,9 @@ const ChannelDetail = () => {
     const [tagInput, setTagInput] = useState('');
     const [tagSuggestions, setTagSuggestions] = useState([]);
 
+    // 모바일 접기 상태
+    const [showDetails, setShowDetails] = useState(false);
+
     // 필터 상태
     const [sortBy, setSortBy] = useState('newest');
     const [filterTag, setFilterTag] = useState('');
@@ -438,159 +441,163 @@ const ChannelDetail = () => {
                         </div>
                     </div>
 
-                    {/* 태그 (모바일에서는 접을 수 있게) */}
-                    <div className="mt-4 pt-4 border-t border-gray-100">
-                        <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-xs sm:text-sm font-medium text-gray-700">태그</h3>
-                            {!editingTags && (
-                                <button
-                                    onClick={() => setEditingTags(true)}
-                                    className="text-xs sm:text-sm text-primary-600 hover:text-primary-700"
-                                >
-                                    편집
-                                </button>
-                            )}
-                        </div>
+                    {/* 모바일: 상세 정보 펼치기 버튼 */}
+                    <button
+                        onClick={() => setShowDetails(!showDetails)}
+                        className="sm:hidden mt-3 w-full flex items-center justify-center gap-1 py-2 text-xs text-gray-500 hover:text-gray-700 border-t border-gray-100"
+                    >
+                        <span>{showDetails ? '접기' : '태그/메모 보기'}</span>
+                        <svg className={`w-4 h-4 transition-transform ${showDetails ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
 
-                        {editingTags ? (
-                            <div>
-                                {/* 현재 태그 목록 */}
-                                <div className="flex flex-wrap gap-1.5 mb-2">
-                                    {channelTags.map((tag) => (
-                                        <span
-                                            key={tag}
-                                            className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs"
-                                        >
-                                            #{tag}
-                                            <button
-                                                onClick={() => removeTag(tag)}
-                                                className="hover:text-primary-900"
+                    {/* 태그/메모 - 모바일에서는 숨김, PC에서는 항상 표시 */}
+                    <div className={`${showDetails ? 'block' : 'hidden'} sm:block`}>
+                        {/* 태그 */}
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-xs sm:text-sm font-medium text-gray-700">태그</h3>
+                                {!editingTags && (
+                                    <button
+                                        onClick={() => setEditingTags(true)}
+                                        className="text-xs sm:text-sm text-primary-600 hover:text-primary-700"
+                                    >
+                                        편집
+                                    </button>
+                                )}
+                            </div>
+
+                            {editingTags ? (
+                                <div>
+                                    <div className="flex flex-wrap gap-1.5 mb-2">
+                                        {channelTags.map((tag) => (
+                                            <span
+                                                key={tag}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs"
                                             >
-                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                            </button>
-                                        </span>
-                                    ))}
-                                </div>
-
-                                {/* 태그 입력 */}
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        value={tagInput}
-                                        onChange={handleTagInputChange}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && tagInput.trim()) {
-                                                e.preventDefault();
-                                                addTag(tagInput);
-                                            }
-                                        }}
-                                        placeholder="태그 입력 후 Enter"
-                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                    />
-                                    {tagSuggestions.length > 0 && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto">
-                                            {tagSuggestions.map((suggestion) => (
+                                                #{tag}
                                                 <button
-                                                    key={suggestion}
-                                                    onClick={() => addTag(suggestion)}
-                                                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                                                    onClick={() => removeTag(tag)}
+                                                    className="hover:text-primary-900"
                                                 >
-                                                    #{suggestion}
+                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
                                                 </button>
-                                            ))}
-                                        </div>
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={tagInput}
+                                            onChange={handleTagInputChange}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && tagInput.trim()) {
+                                                    e.preventDefault();
+                                                    addTag(tagInput);
+                                                }
+                                            }}
+                                            placeholder="태그 입력 후 Enter"
+                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                        />
+                                        {tagSuggestions.length > 0 && (
+                                            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto">
+                                                {tagSuggestions.map((suggestion) => (
+                                                    <button
+                                                        key={suggestion}
+                                                        onClick={() => addTag(suggestion)}
+                                                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                                                    >
+                                                        #{suggestion}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="mt-2 flex justify-end gap-2">
+                                        <button
+                                            onClick={() => {
+                                                setEditingTags(false);
+                                                loadData();
+                                            }}
+                                            className="px-3 py-1 text-xs text-gray-600 hover:text-gray-900"
+                                        >
+                                            취소
+                                        </button>
+                                        <button
+                                            onClick={handleSaveTags}
+                                            className="px-3 py-1 text-xs text-white bg-primary-500 hover:bg-primary-600 rounded"
+                                        >
+                                            저장
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {channelTags.length > 0 ? (
+                                        channelTags.map((tag) => (
+                                            <span
+                                                key={tag}
+                                                className="px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs"
+                                            >
+                                                #{tag}
+                                            </span>
+                                        ))
+                                    ) : (
+                                        <span className="text-xs text-gray-400 italic">태그 없음</span>
                                     )}
                                 </div>
-
-                                <div className="mt-2 flex justify-end gap-2">
-                                    <button
-                                        onClick={() => {
-                                            setEditingTags(false);
-                                            loadData();
-                                        }}
-                                        className="px-3 py-1 text-xs text-gray-600 hover:text-gray-900"
-                                    >
-                                        취소
-                                    </button>
-                                    <button
-                                        onClick={handleSaveTags}
-                                        className="px-3 py-1 text-xs text-white bg-primary-500 hover:bg-primary-600 rounded"
-                                    >
-                                        저장
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex flex-wrap gap-1.5">
-                                {channelTags.length > 0 ? (
-                                    channelTags.map((tag) => (
-                                        <span
-                                            key={tag}
-                                            className="px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs"
-                                        >
-                                            #{tag}
-                                        </span>
-                                    ))
-                                ) : (
-                                    <span className="text-xs text-gray-400 italic">
-                                        태그 없음
-                                    </span>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* 채널 메모 - 모바일에서는 기본 접힘 */}
-                    <div className="mt-4 pt-4 border-t border-gray-100">
-                        <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-xs sm:text-sm font-medium text-gray-700">메모</h3>
-                            {!editingMemo && (
-                                <button
-                                    onClick={() => setEditingMemo(true)}
-                                    className="text-xs sm:text-sm text-primary-600 hover:text-primary-700"
-                                >
-                                    편집
-                                </button>
                             )}
                         </div>
 
-                        {editingMemo ? (
-                            <div>
-                                <textarea
-                                    value={memoText}
-                                    onChange={(e) => setMemoText(e.target.value)}
-                                    placeholder="이 채널에 대한 메모를 작성하세요..."
-                                    className="w-full h-24 sm:h-32 p-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                                />
-                                <div className="mt-2 flex justify-end gap-2">
+                        {/* 메모 */}
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-xs sm:text-sm font-medium text-gray-700">메모</h3>
+                                {!editingMemo && (
                                     <button
-                                        onClick={() => {
-                                            setMemoText(channel.memo || '');
-                                            setEditingMemo(false);
-                                        }}
-                                        className="px-3 py-1 text-xs text-gray-600 hover:text-gray-900"
+                                        onClick={() => setEditingMemo(true)}
+                                        className="text-xs sm:text-sm text-primary-600 hover:text-primary-700"
                                     >
-                                        취소
+                                        편집
                                     </button>
-                                    <button
-                                        onClick={handleSaveMemo}
-                                        className="px-3 py-1 text-xs text-white bg-primary-500 hover:bg-primary-600 rounded"
-                                    >
-                                        저장
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="text-xs sm:text-sm text-gray-600 whitespace-pre-wrap line-clamp-2 sm:line-clamp-none">
-                                {channel.memo || (
-                                    <span className="text-gray-400 italic">
-                                        메모 없음
-                                    </span>
                                 )}
                             </div>
-                        )}
+
+                            {editingMemo ? (
+                                <div>
+                                    <textarea
+                                        value={memoText}
+                                        onChange={(e) => setMemoText(e.target.value)}
+                                        placeholder="이 채널에 대한 메모를 작성하세요..."
+                                        className="w-full h-24 sm:h-32 p-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                                    />
+                                    <div className="mt-2 flex justify-end gap-2">
+                                        <button
+                                            onClick={() => {
+                                                setMemoText(channel.memo || '');
+                                                setEditingMemo(false);
+                                            }}
+                                            className="px-3 py-1 text-xs text-gray-600 hover:text-gray-900"
+                                        >
+                                            취소
+                                        </button>
+                                        <button
+                                            onClick={handleSaveMemo}
+                                            className="px-3 py-1 text-xs text-white bg-primary-500 hover:bg-primary-600 rounded"
+                                        >
+                                            저장
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-xs sm:text-sm text-gray-600 whitespace-pre-wrap">
+                                    {channel.memo || <span className="text-gray-400 italic">메모 없음</span>}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </section>
 
@@ -641,35 +648,6 @@ const ChannelDetail = () => {
                             )}
                         </div>
                     </div>
-
-                    {/* 태그 필터 */}
-                    {allTags.length > 0 && (
-                        <div className="mb-4 flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                            <button
-                                onClick={() => setFilterTag('')}
-                                className={`flex-shrink-0 px-3 py-2 sm:py-1.5 text-sm rounded-full transition-colors min-h-[40px] sm:min-h-0 ${
-                                    filterTag === ''
-                                        ? 'bg-primary-500 text-white'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
-                            >
-                                전체
-                            </button>
-                            {allTags.slice(0, 10).map(tag => (
-                                <button
-                                    key={tag.id}
-                                    onClick={() => setFilterTag(tag.name)}
-                                    className={`flex-shrink-0 px-3 py-2 sm:py-1.5 text-sm rounded-full transition-colors min-h-[40px] sm:min-h-0 ${
-                                        filterTag === tag.name
-                                            ? 'bg-primary-500 text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
-                                >
-                                    #{tag.name}
-                                </button>
-                            ))}
-                        </div>
-                    )}
 
                     {/* 영상 그리드 - Masonry 레이아웃 */}
                     {videos.length > 0 ? (

@@ -338,24 +338,6 @@ const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = 
                 </div>
             )}
 
-            {/* 추천 태그 - 모바일 터치 친화적 */}
-            {filteredRecommendations.length > 0 && (
-                <div>
-                    <div className="text-sm sm:text-xs text-gray-500 mb-2 sm:mb-1.5">추천 태그</div>
-                    <div className="flex flex-wrap gap-2 sm:gap-1.5">
-                        {filteredRecommendations.map((tag, index) => (
-                            <button
-                                key={index}
-                                type="button"
-                                onClick={() => addTag(tag)}
-                                className="px-3 py-2 sm:px-2 sm:py-1 text-sm sm:text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg sm:rounded transition-colors min-h-[40px] sm:min-h-0"
-                            >
-                                #{tag}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
