@@ -9,6 +9,7 @@ const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = 
     const [expandedCategories, setExpandedCategories] = useState({});
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [showCategoryPanel, setShowCategoryPanel] = useState(false);
+    const [pendingTags, setPendingTags] = useState([]); // 선택 대기 중인 태그들
     const inputRef = useRef(null);
     const suggestionsRef = useRef(null);
 
@@ -101,6 +102,33 @@ const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = 
         }));
     };
 
+    // 카테고리 패널에서 태그 선택/해제 토글
+    const togglePendingTag = (tagName) => {
+        setPendingTags(prev =>
+            prev.includes(tagName)
+                ? prev.filter(t => t !== tagName)
+                : [...prev, tagName]
+        );
+    };
+
+    // 선택한 태그들 한번에 추가
+    const applyPendingTags = () => {
+        if (pendingTags.length > 0) {
+            const newTags = pendingTags.filter(t => !tags.includes(t));
+            if (newTags.length > 0) {
+                onChange([...tags, ...newTags]);
+            }
+            setPendingTags([]);
+        }
+        setShowCategoryPanel(false);
+    };
+
+    // 패널 닫을 때 선택 초기화
+    const closeCategoryPanel = () => {
+        setPendingTags([]);
+        setShowCategoryPanel(false);
+    };
+
     const filteredRecommendations = recommendations.filter(r => !tags.includes(r));
 
     return (
@@ -180,21 +208,56 @@ const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = 
                 )}
             </div>
 
-            {/* 카테고리별 태그 패널 - 모바일 최적화 */}
+            {/* 카테고리별 태그 패널 - 다중 선택 모드 */}
             {showCategoryPanel && categorizedTags.length > 0 && (
                 <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden">
+                    {/* 헤더: 선택 개수 + 완료/취소 버튼 */}
                     <div className="p-3 sm:p-2 bg-gray-100 border-b border-gray-200 flex items-center justify-between">
-                        <span className="text-sm sm:text-xs font-medium text-gray-600">카테고리별 태그 (탭하여 추가)</span>
-                        <button
-                            type="button"
-                            onClick={() => setShowCategoryPanel(false)}
-                            className="p-1.5 text-gray-400 hover:text-gray-600 rounded sm:hidden"
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
+                        <span className="text-sm sm:text-xs font-medium text-gray-600">
+                            태그 선택 {pendingTags.length > 0 && <span className="text-primary-600">({pendingTags.length}개 선택됨)</span>}
+                        </span>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={closeCategoryPanel}
+                                className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 rounded transition-colors"
+                            >
+                                취소
+                            </button>
+                            <button
+                                type="button"
+                                onClick={applyPendingTags}
+                                disabled={pendingTags.length === 0}
+                                className="px-4 py-1.5 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors"
+                            >
+                                완료
+                            </button>
+                        </div>
                     </div>
+
+                    {/* 선택된 태그 미리보기 */}
+                    {pendingTags.length > 0 && (
+                        <div className="px-3 py-2 bg-primary-50 border-b border-primary-100 flex flex-wrap gap-1.5">
+                            {pendingTags.map((tagName) => (
+                                <span
+                                    key={tagName}
+                                    className="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 text-sm rounded"
+                                >
+                                    #{tagName}
+                                    <button
+                                        type="button"
+                                        onClick={() => togglePendingTag(tagName)}
+                                        className="text-primary-500 hover:text-primary-700"
+                                    >
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
                     <div className="max-h-72 sm:max-h-60 overflow-y-auto">
                         {categorizedTags.map((category) => {
                             const categoryKey = category.id || 'uncategorized';
@@ -231,27 +294,35 @@ const TagInput = ({ tags = [], onChange, channelId = null, showCategoryPicker = 
                                         </svg>
                                     </button>
 
-                                    {/* 태그 목록 - 터치 친화적 크기 */}
+                                    {/* 태그 목록 - 체크박스 스타일 선택 */}
                                     {isExpanded && availableTags.length > 0 && (
                                         <div className="px-3 pb-3 sm:pb-2 flex flex-wrap gap-2 sm:gap-1.5">
-                                            {availableTags.map((tag) => (
-                                                <button
-                                                    key={tag.id}
-                                                    type="button"
-                                                    onClick={() => addTag(tag.name)}
-                                                    className="px-3 py-2 sm:px-2 sm:py-1 text-sm sm:text-xs rounded-lg sm:rounded transition-colors hover:opacity-80 min-h-[40px] sm:min-h-0"
-                                                    style={{
-                                                        backgroundColor: `${category.color}20`,
-                                                        color: category.color,
-                                                        border: `1px solid ${category.color}40`
-                                                    }}
-                                                >
-                                                    #{tag.name}
-                                                    {tag.count > 0 && (
-                                                        <span className="ml-1 opacity-60">({tag.count})</span>
-                                                    )}
-                                                </button>
-                                            ))}
+                                            {availableTags.map((tag) => {
+                                                const isSelected = pendingTags.includes(tag.name);
+                                                return (
+                                                    <button
+                                                        key={tag.id}
+                                                        type="button"
+                                                        onClick={() => togglePendingTag(tag.name)}
+                                                        className={`px-3 py-2 sm:px-2 sm:py-1 text-sm sm:text-xs rounded-lg sm:rounded transition-all min-h-[40px] sm:min-h-0 flex items-center gap-1.5 ${isSelected ? 'ring-2 ring-primary-500 ring-offset-1' : ''}`}
+                                                        style={{
+                                                            backgroundColor: isSelected ? category.color : `${category.color}20`,
+                                                            color: isSelected ? 'white' : category.color,
+                                                            border: `1px solid ${category.color}${isSelected ? '' : '40'}`
+                                                        }}
+                                                    >
+                                                        {isSelected && (
+                                                            <svg className="w-4 h-4 sm:w-3 sm:h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                        )}
+                                                        #{tag.name}
+                                                        {tag.count > 0 && (
+                                                            <span className={`ml-1 ${isSelected ? 'opacity-80' : 'opacity-60'}`}>({tag.count})</span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     )}
 
