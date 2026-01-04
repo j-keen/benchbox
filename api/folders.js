@@ -1,11 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.SUPABASE_URL || 'https://pawwbhmaenjnsxptomtg.supabase.co';
-const supabaseKey = process.env.SUPABASE_ANON_KEY || 'sb_publishable_ravpeXJd4294xbcpG6jBMQ_ij2RkcZL';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const SUPABASE_URL = 'https://pawwbhmaenjnsxptomtg.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhd3diaG1hZW5qbnN4cHRvbXRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgyNDE2MTgsImV4cCI6MjA2MzgxNzYxOH0.n5zXW8WReVH0bshgxOm-C82F2hqNfLlgXJpE0kxeYnc';
 
 export default async function handler(req, res) {
-    // CORS 헤더
+    // CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -19,14 +16,21 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { data: folders, error } = await supabase
-            .from('folders')
-            .select('*')
-            .order('sort_order', { ascending: true })
-            .order('created_at', { ascending: false });
+        const response = await fetch(
+            `${SUPABASE_URL}/rest/v1/folders?select=*&order=sort_order.asc,created_at.desc`,
+            {
+                headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`
+                }
+            }
+        );
 
-        if (error) throw error;
+        if (!response.ok) {
+            throw new Error(`Supabase error: ${response.status}`);
+        }
 
+        const folders = await response.json();
         return res.status(200).json({ folders: folders || [] });
     } catch (error) {
         console.error('Folders API error:', error);

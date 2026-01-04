@@ -1,31 +1,25 @@
-import { createClient } from '@supabase/supabase-js';
+const SUPABASE_URL = 'https://pawwbhmaenjnsxptomtg.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhd3diaG1hZW5qbnN4cHRvbXRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgyNDE2MTgsImV4cCI6MjA2MzgxNzYxOH0.n5zXW8WReVH0bshgxOm-C82F2hqNfLlgXJpE0kxeYnc';
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://pawwbhmaenjnsxptomtg.supabase.co';
-const supabaseKey = process.env.SUPABASE_ANON_KEY || 'sb_publishable_ravpeXJd4294xbcpG6jBMQ_ij2RkcZL';
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// URL 분석
 function analyzeUrl(url) {
     const normalizedUrl = url.trim();
-
     if (/youtube\.com\/@|youtube\.com\/channel\//.test(normalizedUrl)) {
-        return { platform: 'youtube', type: 'channel' };
+        return { platform: 'youtube' };
     }
     if (/tiktok\.com\/@/.test(normalizedUrl) && !/\/video\//.test(normalizedUrl)) {
-        return { platform: 'tiktok', type: 'channel' };
+        return { platform: 'tiktok' };
     }
     if (/instagram\.com\/([a-zA-Z0-9_.-]+)\/?(\?.*)?$/.test(normalizedUrl)) {
         const match = normalizedUrl.match(/instagram\.com\/([a-zA-Z0-9_.-]+)/);
         if (match && !['p', 'reel', 'reels', 'stories', 'explore', 'direct'].includes(match[1])) {
-            return { platform: 'instagram', type: 'channel' };
+            return { platform: 'instagram' };
         }
     }
-
-    return { platform: 'other', type: 'channel' };
+    return { platform: 'other' };
 }
 
 export default async function handler(req, res) {
-    // CORS 헤더
+    // CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -34,16 +28,23 @@ export default async function handler(req, res) {
         return res.status(200).end();
     }
 
+    const headers = {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+    };
+
     // GET: 채널 목록
     if (req.method === 'GET') {
         try {
-            const { data: channels, error } = await supabase
-                .from('channels')
-                .select('*')
-                .order('created_at', { ascending: false });
+            const response = await fetch(
+                `${SUPABASE_URL}/rest/v1/channels?select=*&order=created_at.desc`,
+                { headers }
+            );
 
-            if (error) throw error;
+            if (!response.ok) throw new Error(`Supabase error: ${response.status}`);
 
+            const channels = await response.json();
             return res.status(200).json({ channels: channels || [] });
         } catch (error) {
             console.error('Channels GET error:', error);
@@ -61,31 +62,34 @@ export default async function handler(req, res) {
             }
 
             // 중복 체크
-            const { data: existing } = await supabase
-                .from('channels')
-                .select('id')
-                .eq('url', url)
-                .maybeSingle();
-
-            if (existing) {
+            const checkRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/channels?url=eq.${encodeURIComponent(url)}&select=id`,
+                { headers }
+            );
+            const existing = await checkRes.json();
+            if (existing && existing.length > 0) {
                 return res.status(409).json({ error: '이미 등록된 채널입니다.' });
             }
 
             const urlInfo = analyzeUrl(url);
 
-            const { data: savedChannel, error } = await supabase
-                .from('channels')
-                .insert({
-                    url,
-                    platform: urlInfo.platform,
-                    title: url,
-                    folder_id: folder_id || null
-                })
-                .select()
-                .single();
+            const insertRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/channels`,
+                {
+                    method: 'POST',
+                    headers: { ...headers, 'Prefer': 'return=representation' },
+                    body: JSON.stringify({
+                        url,
+                        platform: urlInfo.platform,
+                        title: url,
+                        folder_id: folder_id || null
+                    })
+                }
+            );
 
-            if (error) throw error;
+            if (!insertRes.ok) throw new Error(`Insert error: ${insertRes.status}`);
 
+            const [savedChannel] = await insertRes.json();
             return res.status(201).json(savedChannel);
         } catch (error) {
             console.error('Channels POST error:', error);
