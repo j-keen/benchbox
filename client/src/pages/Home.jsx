@@ -747,24 +747,6 @@ const Home = () => {
                                         ))}
                                     </select>
                                 )}
-                                {/* 태그 추가 */}
-                                {selectedVideos.size > 0 && (
-                                    <button
-                                        onClick={() => setShowBatchTagModal(true)}
-                                        className="px-4 py-2 sm:py-1.5 text-sm bg-white/20 hover:bg-white/30 rounded-lg transition-colors flex items-center gap-1 min-h-[44px] sm:min-h-0"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                        </svg>
-                                        태그
-                                    </button>
-                                )}
-                                <button
-                                    onClick={clearSelection}
-                                    className="px-4 py-2 sm:py-1.5 text-sm bg-white/20 hover:bg-white/30 rounded-lg transition-colors min-h-[44px] sm:min-h-0"
-                                >
-                                    취소
-                                </button>
                                 <button
                                     onClick={handleDeleteSelected}
                                     className="px-4 py-2 sm:py-1.5 text-sm bg-red-500 hover:bg-red-600 rounded-lg transition-colors flex items-center gap-1 min-h-[44px] sm:min-h-0"
@@ -816,15 +798,6 @@ const Home = () => {
                                         {folders.length}개 폴더 · {channels.length}개 채널
                                     </span>
                                 </h2>
-                                {/* 채널 전체 선택 버튼 */}
-                                {channels.length > 0 && (
-                                    <button
-                                        onClick={selectedChannels.size === channels.length ? () => setSelectedChannels(new Set()) : selectAllChannels}
-                                        className="text-xs sm:text-sm text-gray-500 hover:text-primary-600 transition-colors"
-                                    >
-                                        {selectedChannels.size === channels.length ? '선택 해제' : '채널 전체 선택'}
-                                    </button>
-                                )}
                             </div>
 
                             {/* 추가 버튼 그룹 - 항상 보임 */}
@@ -1015,26 +988,16 @@ const Home = () => {
                                         {videos.length}개
                                     </span>
                                 </h2>
-                                {/* 미분류만 토글 */}
-                                <button
-                                    onClick={() => setShowUnassignedOnly(!showUnassignedOnly)}
-                                    className={`text-xs px-2 py-1 rounded-full transition-colors ${
-                                        showUnassignedOnly
-                                            ? 'bg-orange-500 text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
+                                {/* 정렬 */}
+                                <select
+                                    value={sortBy}
+                                    onChange={(e) => setSortBy(e.target.value)}
+                                    className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                 >
-                                    {showUnassignedOnly ? '✓ 미분류만' : '미분류만'}
-                                </button>
-                                {/* 전체 선택 버튼 */}
-                                {videos.length > 0 && (
-                                    <button
-                                        onClick={selectedVideos.size === videos.length ? () => setSelectedVideos(new Set()) : selectAllVideos}
-                                        className="text-xs sm:text-sm text-gray-500 hover:text-primary-600 transition-colors"
-                                    >
-                                        {selectedVideos.size === videos.length ? '선택 해제' : '전체 선택'}
-                                    </button>
-                                )}
+                                    <option value="newest">최신순</option>
+                                    <option value="oldest">오래된순</option>
+                                    <option value="title">제목순</option>
+                                </select>
                             </div>
 
                             {/* 영상 추가 버튼 */}
@@ -1048,73 +1011,7 @@ const Home = () => {
                                 영상 추가
                             </button>
                         </div>
-
-                        {/* 필터 - 모바일에서 줄바꿈 */}
-                        <div className="flex flex-wrap items-center gap-2">
-                            <select
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value)}
-                                className="text-sm border border-gray-200 rounded-lg px-3 py-2 sm:py-1.5 focus:ring-2 focus:ring-primary-500 focus:border-transparent min-h-[44px] sm:min-h-0"
-                            >
-                                <option value="newest">최신순</option>
-                                <option value="oldest">오래된순</option>
-                                <option value="title">제목순</option>
-                            </select>
-
-                            <select
-                                value={filterVideoType}
-                                onChange={(e) => setFilterVideoType(e.target.value)}
-                                className="text-sm border border-gray-200 rounded-lg px-3 py-2 sm:py-1.5 focus:ring-2 focus:ring-primary-500 focus:border-transparent min-h-[44px] sm:min-h-0"
-                            >
-                                <option value="all">전체 형식</option>
-                                <option value="shorts">숏폼</option>
-                                <option value="long">롱폼</option>
-                            </select>
-
-                            <select
-                                value={filterPlatform}
-                                onChange={(e) => setFilterPlatform(e.target.value)}
-                                className="text-sm border border-gray-200 rounded-lg px-3 py-2 sm:py-1.5 focus:ring-2 focus:ring-primary-500 focus:border-transparent min-h-[44px] sm:min-h-0"
-                            >
-                                <option value="all">전체 플랫폼</option>
-                                <option value="youtube">{getPlatformName('youtube')}</option>
-                                <option value="tiktok">{getPlatformName('tiktok')}</option>
-                                <option value="instagram">{getPlatformName('instagram')}</option>
-                                <option value="xiaohongshu">{getPlatformName('xiaohongshu')}</option>
-                                <option value="other">{getPlatformName('other')}</option>
-                            </select>
-                        </div>
                     </div>
-
-                    {/* 태그 필터 */}
-                    {allTags.length > 0 && (
-                        <div className="mb-4 flex flex-wrap gap-2">
-                            <button
-                                onClick={() => setFilterTag('')}
-                                className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                                    filterTag === ''
-                                        ? 'bg-primary-500 text-white'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
-                            >
-                                전체
-                            </button>
-                            {allTags.slice(0, 10).map(tag => (
-                                <button
-                                    key={tag.id}
-                                    onClick={() => setFilterTag(tag.name)}
-                                    className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                                        filterTag === tag.name
-                                            ? 'bg-primary-500 text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
-                                >
-                                    #{tag.name}
-                                    <span className="ml-1 text-xs opacity-60">{tag.count}</span>
-                                </button>
-                            ))}
-                        </div>
-                    )}
 
                     {/* 영상 그리드 */}
                     {loading ? (

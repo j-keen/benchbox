@@ -107,47 +107,6 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
         return date.toLocaleDateString('ko-KR');
     };
 
-    // description에서 통계 정보 파싱
-    const parseStats = (description) => {
-        if (!description) return null;
-
-        let views = null;
-        let likes = null;
-        let comments = null;
-
-        // "조회수 10.5만" 또는 "10.5K views" 패턴 (YouTube)
-        const viewsMatch = description.match(/조회수\s*([\d,.]+[KkMm만억]?)|(\d[\d,.]*[KkMm]?)\s*views?/i);
-        if (viewsMatch) {
-            views = viewsMatch[1] || viewsMatch[2];
-        }
-
-        // "좋아요 1.5만개" 또는 "570.5K개" 또는 "1,431 likes" 패턴
-        const likesMatch = description.match(/좋아요\s*([\d,.]+[KkMm만억]?)개?|(\d[\d,]*)\s*likes?/i);
-        if (likesMatch) {
-            likes = likesMatch[1] || likesMatch[2];
-        }
-
-        // "댓글 500개" 또는 "7606개" 또는 "8 comments" 패턴
-        const commentsMatch = description.match(/댓글\s*([\d,.]+[KkMm만억]?)개?|(\d[\d,]*)\s*comments?/i);
-        if (commentsMatch) {
-            comments = commentsMatch[1] || commentsMatch[2];
-        }
-
-        if (!views && !likes && !comments) return null;
-        return { views, likes, comments };
-    };
-
-    // description에서 작성자 추출 (author 필드가 없을 경우)
-    const parseAuthor = (description) => {
-        if (!description) return null;
-        // "작성자: @username" 또는 "by @username" 패턴
-        const match = description.match(/(?:작성자|by)[:\s]*(@?\w+)/i);
-        return match ? match[1] : null;
-    };
-
-    const stats = parseStats(video.description);
-    const author = video.author || parseAuthor(video.description);
-
     const handleCheckClick = (e) => {
         e.stopPropagation();
         if (onSelect) {
@@ -246,62 +205,12 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
                     </div>
                 )}
 
-                <h3 className="font-medium text-gray-900 line-clamp-2 text-sm leading-5 min-h-[40px]">
+                <h3 className="font-medium text-gray-900 line-clamp-2 text-sm leading-5">
                     {video.title || 'Untitled'}
                 </h3>
 
-                {/* 작성자 정보 */}
-                {author && (
-                    <div className="mt-1 text-xs text-gray-500 truncate">
-                        {author}
-                    </div>
-                )}
-
-                {/* 통계 정보 (조회수, 좋아요, 댓글) */}
-                {stats && (
-                    <div className="mt-1 flex items-center gap-2 text-xs text-gray-400 flex-wrap">
-                        {stats.views && (
-                            <span className="flex items-center gap-1">
-                                <span>👁️</span>
-                                <span>{stats.views}</span>
-                            </span>
-                        )}
-                        {stats.likes && (
-                            <span className="flex items-center gap-1">
-                                <span>❤️</span>
-                                <span>{stats.likes}</span>
-                            </span>
-                        )}
-                        {stats.comments && (
-                            <span className="flex items-center gap-1">
-                                <span>💬</span>
-                                <span>{stats.comments}</span>
-                            </span>
-                        )}
-                    </div>
-                )}
-
-                {/* 태그 */}
-                {video.tags && video.tags.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                        {video.tags.slice(0, 3).map((tag, index) => (
-                            <span
-                                key={index}
-                                className="text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded"
-                            >
-                                #{tag}
-                            </span>
-                        ))}
-                        {video.tags.length > 3 && (
-                            <span className="text-xs text-gray-400">
-                                +{video.tags.length - 3}
-                            </span>
-                        )}
-                    </div>
-                )}
-
                 {/* 저장일 */}
-                <div className="mt-2 text-xs text-gray-400">
+                <div className="mt-1 text-xs text-gray-400">
                     {formatDate(video.created_at)}
                 </div>
             </div>
