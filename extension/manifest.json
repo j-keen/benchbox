@@ -5,7 +5,8 @@
   "description": "YouTube, TikTok 등 영상을 BenchBox에 빠르게 저장",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "contextMenus"
   ],
   "host_permissions": [
     "https://*.youtube.com/*",
