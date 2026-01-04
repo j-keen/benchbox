@@ -515,6 +515,29 @@ const Home = () => {
         }
     };
 
+    // 선택한 영상을 채널로 이동
+    const handleMoveVideosToChannel = async (channelId) => {
+        if (selectedVideos.size === 0) return;
+
+        try {
+            const count = selectedVideos.size;
+            for (const videoId of selectedVideos) {
+                await videosApi.update(videoId, { channel_id: channelId });
+            }
+            setVideos(prev => prev.filter(v => !selectedVideos.has(v.id)));
+            setChannels(prev => prev.map(c =>
+                c.id === channelId
+                    ? { ...c, video_count: (c.video_count || 0) + count }
+                    : c
+            ));
+            clearSelection();
+            toast.success('영상을 채널로 이동했습니다.');
+        } catch (error) {
+            console.error('채널 이동 오류:', error);
+            toast.error('채널 이동 중 오류가 발생했습니다.');
+        }
+    };
+
     // 일괄 태그 추가
     const handleBatchTagApply = async (tags) => {
         try {
@@ -703,6 +726,24 @@ const Home = () => {
                                         <option value="" disabled>영상 → 폴더</option>
                                         {folders.map(folder => (
                                             <option key={folder.id} value={folder.id}>{folder.name}</option>
+                                        ))}
+                                    </select>
+                                )}
+                                {/* 영상 채널 이동 */}
+                                {selectedVideos.size > 0 && channels.length > 0 && (
+                                    <select
+                                        onChange={(e) => {
+                                            if (e.target.value) {
+                                                handleMoveVideosToChannel(e.target.value);
+                                                e.target.value = '';
+                                            }
+                                        }}
+                                        className="px-3 py-2 sm:py-1.5 text-sm bg-white/20 hover:bg-white/30 rounded-lg text-white border-0 cursor-pointer min-h-[44px] sm:min-h-0"
+                                        defaultValue=""
+                                    >
+                                        <option value="" disabled>영상 → 채널</option>
+                                        {channels.map(channel => (
+                                            <option key={channel.id} value={channel.id}>{channel.title}</option>
                                         ))}
                                     </select>
                                 )}
