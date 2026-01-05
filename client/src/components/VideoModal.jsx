@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { videosApi } from '../utils/api';
 import { getPlatformIcon, getPlatformColor, getPlatformName } from '../utils/platformIcons';
 import TagInput from './TagInput';
@@ -13,7 +13,6 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
     const [embedLoading, setEmbedLoading] = useState(true);
     const [isWidescreen, setIsWidescreen] = useState(false); // 기본 9:16, true면 16:9
     const [showMemoTags, setShowMemoTags] = useState(false); // 모바일 접기 상태
-    const tiktokContainerRef = useRef(null);
 
     const PlatformIcon = getPlatformIcon(video?.platform);
     const platformColor = getPlatformColor(video?.platform);
@@ -100,44 +99,14 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
         return match ? match[1] : null;
     };
 
-    // TikTok embed.js 로드 및 렌더링
-    useEffect(() => {
-        if (video?.platform === 'tiktok' && tiktokContainerRef.current) {
-            const videoId = getTikTokVideoId(video.url);
-            if (!videoId) return;
+    // TikTok iframe URL 생성
+    const getTikTokEmbedUrl = () => {
+        const videoId = getTikTokVideoId(video?.url);
+        if (!videoId) return null;
+        return `https://www.tiktok.com/embed/v2/${videoId}`;
+    };
 
-            // blockquote 생성
-            tiktokContainerRef.current.innerHTML = `
-                <blockquote class="tiktok-embed" cite="${video.url}" data-video-id="${videoId}" style="max-width: 100%; min-width: 100%;">
-                    <section></section>
-                </blockquote>
-            `;
-
-            // embed.js 스크립트 로드
-            const existingScript = document.querySelector('script[src="https://www.tiktok.com/embed.js"]');
-            if (existingScript) {
-                // 이미 로드된 경우 새로고침
-                if (window.tiktok && window.tiktok.widgets && window.tiktok.widgets.load) {
-                    window.tiktok.widgets.load();
-                } else {
-                    existingScript.remove();
-                    const script = document.createElement('script');
-                    script.src = 'https://www.tiktok.com/embed.js';
-                    script.async = true;
-                    document.body.appendChild(script);
-                }
-            } else {
-                const script = document.createElement('script');
-                script.src = 'https://www.tiktok.com/embed.js';
-                script.async = true;
-                document.body.appendChild(script);
-            }
-
-            setEmbedLoading(false);
-        }
-    }, [video?.id, video?.platform, video?.url]);
-
-    // 임베드 URL 생성 (YouTube용)
+    // 임베드 URL 생성 (YouTube, TikTok)
     const getEmbedUrl = () => {
         if (!video?.url) return null;
 
@@ -147,11 +116,15 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
             return `https://www.youtube.com/embed/${ytMatch[1]}`;
         }
 
+        // TikTok
+        if (video.platform === 'tiktok') {
+            return getTikTokEmbedUrl();
+        }
+
         return null;
     };
 
     const embedUrl = getEmbedUrl();
-    const isTikTok = video?.platform === 'tiktok';
 
     if (!video) return null;
 
@@ -193,35 +166,23 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                         {/* 좌측: 영상 정보 */}
                         <div className="md:w-3/5 p-3 sm:p-6 border-b md:border-b-0 md:border-r border-gray-100">
                             {/* 임베드 또는 썸네일 */}
-                            <div className={`${isTikTok ? 'min-h-[400px]' : isWidescreen ? 'aspect-video' : 'aspect-[9/16] max-h-[60vh] mx-auto'} bg-gray-100 rounded-lg overflow-hidden relative`}>
-                                {/* 비율 전환 버튼 (TikTok 제외) */}
-                                {!isTikTok && (
-                                    <button
-                                        onClick={() => setIsWidescreen(!isWidescreen)}
-                                        className="absolute top-2 left-2 z-20 px-2 py-1 text-xs bg-black/60 hover:bg-black/80 text-white rounded transition-colors flex items-center gap-1"
-                                        title={isWidescreen ? '세로 비율 (9:16)' : '가로 비율 (16:9)'}
-                                    >
-                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            {isWidescreen ? (
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10h6m-6 0H3m6-10h6M9 7H3m12 10h6m0-10h-6" />
-                                            ) : (
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                                            )}
-                                        </svg>
-                                        {isWidescreen ? '9:16' : '16:9'}
-                                    </button>
-                                )}
-                                {/* TikTok 임베드 */}
-                                {isTikTok ? (
-                                    <div
-                                        ref={tiktokContainerRef}
-                                        className="w-full h-full flex items-center justify-center"
-                                        style={{ minHeight: '400px' }}
-                                    >
-                                        {/* 로딩 중 표시 */}
-                                        <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary-500 border-t-transparent"></div>
-                                    </div>
-                                ) : embedUrl && !embedFailed ? (
+                            <div className={`${isWidescreen ? 'aspect-video' : 'aspect-[9/16] max-h-[60vh] mx-auto'} bg-gray-100 rounded-lg overflow-hidden relative`}>
+                                {/* 비율 전환 버튼 */}
+                                <button
+                                    onClick={() => setIsWidescreen(!isWidescreen)}
+                                    className="absolute top-2 left-2 z-20 px-2 py-1 text-xs bg-black/60 hover:bg-black/80 text-white rounded transition-colors flex items-center gap-1"
+                                    title={isWidescreen ? '세로 비율 (9:16)' : '가로 비율 (16:9)'}
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        {isWidescreen ? (
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10h6m-6 0H3m6-10h6M9 7H3m12 10h6m0-10h-6" />
+                                        ) : (
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                        )}
+                                    </svg>
+                                    {isWidescreen ? '9:16' : '16:9'}
+                                </button>
+                                {embedUrl && !embedFailed ? (
                                     <>
                                         {/* 로딩 중 썸네일 표시 */}
                                         {embedLoading && video.thumbnail && (
