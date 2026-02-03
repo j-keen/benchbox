@@ -62,6 +62,17 @@ const Home = () => {
     const [sortBy, setSortBy] = useState('newest');
     const [searchQuery, setSearchQuery] = useState('');
     const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
+    const [durationFilter, setDurationFilter] = useState('all'); // 'all' | 'short' | 'long'
+
+    // 숏폼/롱폼 판별 (URL 기반)
+    const isShortForm = (video) => {
+        const url = video.url || '';
+        // 인스타그램, 틱톡 = 항상 숏폼
+        if (url.includes('instagram.com') || url.includes('tiktok.com')) return true;
+        // 유튜브 Shorts
+        if (url.includes('/shorts/')) return true;
+        return false;
+    };
 
     // 데이터 로드
     useEffect(() => {
@@ -1378,16 +1389,51 @@ const Home = () => {
                 {/* 영상 섹션 */}
                 <section>
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                            <span>
-                                {activeChannel
-                                    ? channels.find(c => c.id === activeChannel)?.title
-                                    : showUnassignedOnly ? '미분류 영상' : '저장한 영상'}
-                            </span>
-                            <span className="text-xs sm:text-sm font-normal text-gray-500">
-                                {videos.length}개
-                            </span>
-                        </h2>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                                <span>
+                                    {activeChannel
+                                        ? channels.find(c => c.id === activeChannel)?.title
+                                        : showUnassignedOnly ? '미분류 영상' : '저장한 영상'}
+                                </span>
+                                <span className="text-xs sm:text-sm font-normal text-gray-500">
+                                    {videos.length}개
+                                </span>
+                            </h2>
+                            {/* 숏폼/롱폼 필터 */}
+                            <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                                <button
+                                    onClick={() => setDurationFilter('all')}
+                                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                                        durationFilter === 'all'
+                                            ? 'bg-white text-gray-900 shadow-sm'
+                                            : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                                >
+                                    전체
+                                </button>
+                                <button
+                                    onClick={() => setDurationFilter('short')}
+                                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                                        durationFilter === 'short'
+                                            ? 'bg-white text-gray-900 shadow-sm'
+                                            : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                                >
+                                    숏폼
+                                </button>
+                                <button
+                                    onClick={() => setDurationFilter('long')}
+                                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                                        durationFilter === 'long'
+                                            ? 'bg-white text-gray-900 shadow-sm'
+                                            : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                                >
+                                    롱폼
+                                </button>
+                            </div>
+                        </div>
                         {/* 데스크탑: 추가 버튼 */}
                         <div className="hidden sm:flex items-center gap-2">
                             <button
@@ -1415,11 +1461,17 @@ const Home = () => {
                     </div>
 
                     {/* 영상 그리드 */}
-                    {loading ? (
-                        <VideoGridSkeleton count={10} />
-                    ) : videos.length > 0 ? (
+                    {(() => {
+                        const filteredVideos = durationFilter === 'all'
+                            ? videos
+                            : durationFilter === 'short'
+                                ? videos.filter(v => isShortForm(v))
+                                : videos.filter(v => !isShortForm(v));
+                        return loading ? (
+                            <VideoGridSkeleton count={10} />
+                        ) : filteredVideos.length > 0 ? (
                         <div className="columns-3 md:columns-4 lg:columns-5 gap-2 sm:gap-4 space-y-2 sm:space-y-4">
-                            {videos.map(video => (
+                            {filteredVideos.map(video => (
                                 <div key={video.id} className="break-inside-avoid">
                                     <VideoCard
                                         video={video}
@@ -1436,18 +1488,33 @@ const Home = () => {
                             <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                             </svg>
-                            <p className="text-gray-500 mb-4">저장된 영상이 없습니다</p>
-                            <button
-                                onClick={() => setShowVideoUrlModal(true)}
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors"
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                첫 영상 추가하기
-                            </button>
+                            <p className="text-gray-500 mb-4">
+                                {durationFilter !== 'all'
+                                    ? `${durationFilter === 'short' ? '숏폼' : '롱폼'} 영상이 없습니다`
+                                    : '저장된 영상이 없습니다'
+                                }
+                            </p>
+                            {durationFilter !== 'all' ? (
+                                <button
+                                    onClick={() => setDurationFilter('all')}
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                                >
+                                    전체 보기
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => setShowVideoUrlModal(true)}
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    첫 영상 추가하기
+                                </button>
+                            )}
                         </div>
-                    )}
+                    );
+                    })()}
                 </section>
             </main>
 
