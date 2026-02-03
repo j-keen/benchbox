@@ -1,23 +1,22 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useRef, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
     PlusIcon,
-    ClipboardDocumentIcon,
     VideoCameraIcon,
     TvIcon,
     FolderPlusIcon,
     TagIcon,
     CheckCircleIcon,
     ChevronDownIcon,
-    LightBulbIcon,
+    LinkIcon,
 } from '@heroicons/react/24/outline';
 
 /**
- * FABMenu - 플로팅 액션 버튼 + 바텀 시트 메뉴
+ * FABMenu - URL 등록 전용 플로팅 버튼 + 롱프레스 메뉴
  *
- * 빠른 작업을 위한 메인 진입점
- * - FAB 클릭 → 바텀 시트 슬라이드업
- * - 6개 퀵 액션 (아이콘 그리드)
+ * - FAB 탭 (짧게) → 클립보드 URL 즉시 등록
+ * - FAB 롱프레스 (400ms+) → 바텀 시트 메뉴
+ * - 5개 퀵 액션 (아이콘 그리드)
  * - 네비게이션 칩
  * - 접을 수 있는 사용 팁
  */
@@ -30,17 +29,43 @@ export default function FABMenu({
     onToggleSelectionMode,
     hidden = false,
 }) {
-    const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
     const [tipsExpanded, setTipsExpanded] = useState(false);
+    const longPressTimer = useRef(null);
+    const isLongPress = useRef(false);
 
-    // 메뉴 열기/닫기
-    const handleToggle = () => {
-        setIsOpen(!isOpen);
-        if (!isOpen) {
-            setTipsExpanded(false); // 열릴 때 팁 접기
+    // FAB 터치 시작 - 롱프레스 감지
+    const handlePointerDown = useCallback(() => {
+        isLongPress.current = false;
+        longPressTimer.current = setTimeout(() => {
+            isLongPress.current = true;
+            setIsOpen(true);
+            setTipsExpanded(false);
+        }, 400);
+    }, []);
+
+    // FAB 터치 종료
+    const handlePointerUp = useCallback(() => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
         }
-    };
+        if (!isLongPress.current) {
+            if (isOpen) {
+                setIsOpen(false);
+            } else {
+                onClipboardPaste();
+            }
+        }
+    }, [isOpen, onClipboardPaste]);
+
+    // 포인터가 버튼 밖으로 나간 경우
+    const handlePointerLeave = useCallback(() => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
+        }
+    }, []);
 
     // 액션 실행 후 메뉴 닫기
     const handleAction = (actionFn) => {
@@ -53,23 +78,15 @@ export default function FABMenu({
         setIsOpen(false);
     };
 
-    // 퀵 액션 데이터
+    // 퀵 액션 데이터 (URL 붙여넣기는 FAB 탭으로 이동)
     const quickActions = [
-        {
-            icon: ClipboardDocumentIcon,
-            label: 'URL 붙여넣기',
-            bgColor: 'bg-primary-100',
-            textColor: 'text-primary-600',
-            action: onClipboardPaste,
-            delay: '0ms',
-        },
         {
             icon: VideoCameraIcon,
             label: '영상 추가',
             bgColor: 'bg-sky-100',
             textColor: 'text-sky-600',
             action: onAddVideo,
-            delay: '50ms',
+            delay: '0ms',
         },
         {
             icon: TvIcon,
@@ -77,7 +94,7 @@ export default function FABMenu({
             bgColor: 'bg-emerald-100',
             textColor: 'text-emerald-600',
             action: onAddChannel,
-            delay: '100ms',
+            delay: '50ms',
         },
         {
             icon: FolderPlusIcon,
@@ -85,7 +102,7 @@ export default function FABMenu({
             bgColor: 'bg-indigo-100',
             textColor: 'text-indigo-600',
             action: onAddFolder,
-            delay: '150ms',
+            delay: '100ms',
         },
         {
             icon: TagIcon,
@@ -93,7 +110,7 @@ export default function FABMenu({
             bgColor: 'bg-amber-100',
             textColor: 'text-amber-600',
             action: onOpenTagManager,
-            delay: '200ms',
+            delay: '150ms',
         },
         {
             icon: CheckCircleIcon,
@@ -101,15 +118,15 @@ export default function FABMenu({
             bgColor: 'bg-gray-100',
             textColor: 'text-gray-600',
             action: onToggleSelectionMode,
-            delay: '250ms',
+            delay: '200ms',
         },
     ];
 
     // 네비게이션 칩 데이터
     const navChips = [
-        { label: '채널', to: '/channels' },
-        { label: '영상', to: '/videos' },
-        { label: '폴더', to: '/browse' },
+        { label: '채널 전체보기', to: '/channels' },
+        { label: '영상 전체보기', to: '/videos' },
+        { label: '폴더 탐색', to: '/browse' },
     ];
 
     // 사용 팁
@@ -118,26 +135,31 @@ export default function FABMenu({
         { icon: '🎯', text: '영상을 채널 카드에 드래그하면 분류할 수 있어요' },
         { icon: '✨', text: '영상 상세에서 AI가 메모를 다듬어줘요' },
         { icon: '🔍', text: '/ 또는 Ctrl+K로 검색을 바로 열 수 있어요' },
+        { icon: '👆', text: '이 버튼을 길게 누르면 더 많은 기능을 볼 수 있어요' },
     ];
 
     if (hidden) return null;
 
     return (
         <>
-            {/* FAB 버튼 */}
+            {/* FAB 버튼 - 탭: URL 등록, 롱프레스: 메뉴 */}
             <button
-                onClick={handleToggle}
-                className="fixed bottom-6 right-4 z-40 w-14 h-14 bg-gradient-to-br from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center group active:scale-95"
-                aria-label={isOpen ? '메뉴 닫기' : '메뉴 열기'}
+                onPointerDown={handlePointerDown}
+                onPointerUp={handlePointerUp}
+                onPointerLeave={handlePointerLeave}
+                onContextMenu={(e) => e.preventDefault()}
+                className={`fixed bottom-6 right-4 z-40 h-14 bg-gradient-to-br from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 select-none touch-none ${
+                    isOpen ? 'w-14' : 'w-14 sm:w-auto sm:px-5'
+                }`}
+                aria-label={isOpen ? '메뉴 닫기' : 'URL 붙여넣기 (길게 누르면 메뉴)'}
             >
-                <PlusIcon
-                    className={`w-6 h-6 transition-transform duration-200 ${
-                        isOpen ? 'rotate-45' : 'rotate-0'
-                    }`}
-                />
-                {/* 펄스 애니메이션 (열려있지 않을 때만) */}
-                {!isOpen && (
-                    <span className="absolute inset-0 rounded-full bg-primary-400 opacity-0 group-hover:opacity-20 animate-ping"></span>
+                {isOpen ? (
+                    <PlusIcon className="w-6 h-6 rotate-45 transition-transform duration-200" />
+                ) : (
+                    <>
+                        <LinkIcon className="w-6 h-6" />
+                        <span className="hidden sm:inline text-sm font-medium">URL 등록</span>
+                    </>
                 )}
             </button>
 
@@ -156,7 +178,7 @@ export default function FABMenu({
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* 드래그 핸들 */}
-                        <div className="flex justify-center py-3 cursor-grab active:cursor-grabbing">
+                        <div className="flex justify-center py-3">
                             <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
                         </div>
 
@@ -167,7 +189,7 @@ export default function FABMenu({
                                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
                                     빠른 작업
                                 </h3>
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-3 gap-3">
                                     {quickActions.map((action, idx) => (
                                         <button
                                             key={idx}
@@ -193,10 +215,10 @@ export default function FABMenu({
                             {/* 구분선 */}
                             <div className="border-t border-gray-100 mx-6 mb-5"></div>
 
-                            {/* Section 2: 네비게이션 칩 */}
+                            {/* Section 2: 둘러보기 칩 */}
                             <div className="px-6 mb-6">
                                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                                    바로가기
+                                    둘러보기
                                 </h3>
                                 <div className="flex gap-2 flex-wrap">
                                     {navChips.map((chip, idx) => (
@@ -252,7 +274,7 @@ export default function FABMenu({
                 </>
             )}
 
-            {/* 애니메이션 키프레임 (인라인 스타일) */}
+            {/* 애니메이션 키프레임 */}
             <style>{`
                 @keyframes fadeInUp {
                     from {
