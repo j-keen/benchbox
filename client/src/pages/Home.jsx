@@ -12,6 +12,7 @@ import BatchTagModal from '../components/BatchTagModal';
 import QuickUrlModal from '../components/QuickUrlModal';
 import MobileAddModal from '../components/MobileAddModal';
 import TagManagerModal from '../components/TagManagerModal';
+import FABMenu from '../components/FABMenu';
 import { VideoGridSkeleton, ChannelRowSkeleton } from '../components/Skeleton';
 import { getPlatformName } from '../utils/platformIcons';
 
@@ -669,56 +670,8 @@ const Home = () => {
                                 </button>
                             )}
                         </div>
-                        {/* 태그 관리 버튼 */}
-                        <button
-                            onClick={() => setShowTagManager(true)}
-                            className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
-                            title="태그 관리"
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                            </svg>
-                        </button>
                     </div>
 
-                    {/* 모바일: 폴더/채널 추가 + 클립보드 등록 버튼 (균등 크기) */}
-                    <div className="sm:hidden mt-2 flex items-center gap-2">
-                        <button
-                            onClick={() => {
-                                setEditingFolder(null);
-                                setShowFolderModal(true);
-                            }}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-sm font-medium rounded-lg transition-colors min-h-[44px]"
-                        >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                            </svg>
-                            폴더
-                        </button>
-                        <button
-                            onClick={() => setShowChannelUrlModal(true)}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-sm font-medium rounded-lg transition-colors min-h-[44px]"
-                        >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                            </svg>
-                            채널
-                        </button>
-                        <button
-                            onClick={handleClipboardPaste}
-                            disabled={clipboardLoading}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-primary-500 hover:bg-primary-600 disabled:bg-primary-300 text-white text-sm font-medium rounded-lg transition-colors min-h-[44px]"
-                        >
-                            {clipboardLoading ? (
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            ) : (
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                </svg>
-                            )}
-                            URL 등록
-                        </button>
-                    </div>
                     {/* 데스크탑/태블릿: URL 입력 */}
                     <div className="hidden sm:block mt-4">
                         <UrlInput
@@ -822,37 +775,6 @@ const Home = () => {
             </header>
 
             <main className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-6">
-                {/* 빠른 네비게이션 */}
-                <div className="mb-3 sm:mb-6 flex items-center gap-1.5 sm:gap-3 overflow-x-auto scrollbar-hide">
-                    <Link
-                        to="/channels"
-                        className="flex-shrink-0 flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-colors"
-                    >
-                        <svg className="w-4 h-4 sm:w-5 sm:h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        <span className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">채널</span>
-                    </Link>
-                    <Link
-                        to="/videos"
-                        className="flex-shrink-0 flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-colors"
-                    >
-                        <svg className="w-4 h-4 sm:w-5 sm:h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                        <span className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">영상</span>
-                    </Link>
-                    <Link
-                        to="/browse"
-                        className="flex-shrink-0 flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-colors"
-                    >
-                        <svg className="w-4 h-4 sm:w-5 sm:h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                        </svg>
-                        <span className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">폴더</span>
-                    </Link>
-                </div>
-
                 {/* 꿀통채널 섹션 */}
                 <section className="mb-8">
                     {/* 섹션 헤더 - 개선됨 */}
@@ -1105,6 +1027,28 @@ const Home = () => {
                     )}
                 </section>
             </main>
+
+            {/* FAB 메뉴 */}
+            <FABMenu
+                onClipboardPaste={handleClipboardPaste}
+                onAddVideo={() => setShowVideoUrlModal(true)}
+                onAddChannel={() => setShowChannelUrlModal(true)}
+                onAddFolder={() => {
+                    setEditingFolder(null);
+                    setShowFolderModal(true);
+                }}
+                onOpenTagManager={() => setShowTagManager(true)}
+                onToggleSelectionMode={() => {
+                    if (selectionMode) {
+                        setSelectedChannels(new Set());
+                        setSelectedVideos(new Set());
+                        setSelectedFolders(new Set());
+                    } else {
+                        setSelectionMode(true);
+                    }
+                }}
+                hidden={!!selectedVideo || showFolderModal || showBatchTagModal || showChannelUrlModal || showVideoUrlModal || showTagManager || showMobileAddModal}
+            />
 
             {/* 영상 상세 모달 */}
             {selectedVideo && (

@@ -976,7 +976,8 @@ export const parseUrlApi = {
 };
 
 // AI 어시스트 API
-const GEMINI_API_KEY = 'AIzaSyBP72SA8upFcS5Buykjn5oSfvfWnvDosAw';
+// Google API Key - 환경변수에서 로드 (절대 하드코딩 금지!)
+const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || '';
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 async function callGemini(prompt, maxTokens = 500) {
@@ -988,7 +989,11 @@ async function callGemini(prompt, maxTokens = 500) {
             generationConfig: { temperature: 0.6, maxOutputTokens: maxTokens }
         })
     });
-    if (!response.ok) throw new Error('Gemini API 호출 실패');
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const msg = errorData?.error?.message || `HTTP ${response.status}`;
+        throw new Error(`Gemini API 오류: ${msg}`);
+    }
     const data = await response.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 }
@@ -1067,7 +1072,7 @@ ${memo}
 };
 
 // YouTube 댓글 API
-const YOUTUBE_API_KEY = 'AIzaSyBP72SA8upFcS5Buykjn5oSfvfWnvDosAw';
+const YOUTUBE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || '';
 
 export const youtubeCommentsApi = {
     getComments: async (videoUrl) => {

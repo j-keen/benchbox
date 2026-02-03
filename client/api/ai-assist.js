@@ -1,5 +1,5 @@
 // Vercel Serverless Function for AI Assistance using Google Gemini API
-const GEMINI_API_KEY = process.env.GOOGLE_API_KEY || 'AIzaSyBP72SA8upFcS5Buykjn5oSfvfWnvDosAw';
+const GEMINI_API_KEY = process.env.GOOGLE_API_KEY;
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 export default async function handler(req, res) {
@@ -18,6 +18,10 @@ export default async function handler(req, res) {
   // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  if (!GEMINI_API_KEY) {
+    return res.status(500).json({ error: 'GOOGLE_API_KEY 환경변수가 설정되지 않았습니다.' });
   }
 
   try {

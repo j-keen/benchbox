@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "@supabase/supabase-js": "^2.89.0",
     "axios": "^1.6.2",
     "cheerio": "^1.0.0-rc.12",
