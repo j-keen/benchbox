@@ -1,5 +1,45 @@
 import { supabase } from '../lib/supabase';
 
+// Supabase 쿼리 재시도 래퍼 (503 Service Unavailable 대응)
+async function withRetry(fn, maxRetries = 3) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const result = await fn();
+            // Supabase returns { data, error } - check for retryable errors
+            if (result?.error) {
+                const err = result.error;
+                const isRetryable = err.code === '503' ||
+                    err.message?.includes('Service Unavailable') ||
+                    err.message?.includes('fetch failed') ||
+                    err.message?.includes('Failed to fetch') ||
+                    err.code === 'PGRST503';
+
+                if (isRetryable && attempt < maxRetries) {
+                    const delay = Math.min(500 * Math.pow(2, attempt), 4000);
+                    console.warn(`Supabase 503 오류, ${delay}ms 후 재시도 (${attempt + 1}/${maxRetries})...`);
+                    await new Promise(r => setTimeout(r, delay));
+                    continue;
+                }
+            }
+            return result;
+        } catch (err) {
+            // Network errors (fetch failed, etc.)
+            const isNetworkError = err.message?.includes('fetch') ||
+                err.message?.includes('network') ||
+                err.message?.includes('Failed to fetch') ||
+                err.name === 'TypeError';
+
+            if (isNetworkError && attempt < maxRetries) {
+                const delay = Math.min(500 * Math.pow(2, attempt), 4000);
+                console.warn(`네트워크 오류, ${delay}ms 후 재시도 (${attempt + 1}/${maxRetries})...`);
+                await new Promise(r => setTimeout(r, delay));
+                continue;
+            }
+            throw err;
+        }
+    }
+}
+
 // 이미지 업로드 API (Supabase Storage)
 export const storageApi = {
     uploadImage: async (file, folder = 'thumbnails') => {
@@ -133,15 +173,15 @@ export const videosApi = {
                 query = query.order('created_at', { ascending: false });
         }
 
-        const { data: videos, error } = await query;
+        const { data: videos, error } = await withRetry(() => query);
         if (error) throw error;
 
         // 태그 가져오기
         const videosWithTags = await Promise.all(videos.map(async (video) => {
-            const { data: tagData } = await supabase
+            const { data: tagData } = await withRetry(() => supabase
                 .from('video_tags')
                 .select('tags(name)')
-                .eq('video_id', video.id);
+                .eq('video_id', video.id));
             const tags = tagData?.map(t => t.tags?.name).filter(Boolean) || [];
 
             // 태그 필터
@@ -168,18 +208,18 @@ export const videosApi = {
     },
 
     getById: async (id) => {
-        const { data: video, error } = await supabase
+        const { data: video, error } = await withRetry(() => supabase
             .from('videos')
             .select('*, channels(title)')
             .eq('id', id)
-            .single();
+            .single());
 
         if (error) throw error;
 
-        const { data: tagData } = await supabase
+        const { data: tagData } = await withRetry(() => supabase
             .from('video_tags')
             .select('tags(name)')
-            .eq('video_id', id);
+            .eq('video_id', id));
 
         const tags = tagData?.map(t => t.tags?.name).filter(Boolean) || [];
 
@@ -302,14 +342,14 @@ export const channelsApi = {
         }
 
         query = query.order('created_at', { ascending: false });
-        const { data: channels, error } = await query;
+        const { data: channels, error } = await withRetry(() => query);
         if (error) throw error;
 
         const channelsWithCount = await Promise.all(channels.map(async (channel) => {
-            const { count } = await supabase
+            const { count } = await withRetry(() => supabase
                 .from('videos')
                 .select('*', { count: 'exact', head: true })
-                .eq('channel_id', channel.id);
+                .eq('channel_id', channel.id));
 
             return {
                 ...channel,
@@ -323,18 +363,18 @@ export const channelsApi = {
     },
 
     getById: async (id) => {
-        const { data: channel, error } = await supabase
+        const { data: channel, error } = await withRetry(() => supabase
             .from('channels')
             .select('*')
             .eq('id', id)
-            .single();
+            .single());
 
         if (error) throw error;
 
-        const { count } = await supabase
+        const { count } = await withRetry(() => supabase
             .from('videos')
             .select('*', { count: 'exact', head: true })
-            .eq('channel_id', id);
+            .eq('channel_id', id));
 
         return { data: { ...channel, video_count: count || 0 } };
     },
@@ -394,16 +434,16 @@ export const channelsApi = {
 
         await supabase.from('channels').update(updates).eq('id', id);
 
-        const { data: updatedChannel } = await supabase
+        const { data: updatedChannel } = await withRetry(() => supabase
             .from('channels')
             .select('*, folders(name, color)')
             .eq('id', id)
-            .single();
+            .single());
 
-        const { count } = await supabase
+        const { count } = await withRetry(() => supabase
             .from('videos')
             .select('*', { count: 'exact', head: true })
-            .eq('channel_id', id);
+            .eq('channel_id', id));
 
         return {
             data: {
@@ -439,24 +479,24 @@ export const channelsApi = {
 // 폴더 API
 export const foldersApi = {
     getAll: async () => {
-        const { data: folders, error } = await supabase
+        const { data: folders, error } = await withRetry(() => supabase
             .from('folders')
             .select('*')
             .order('sort_order', { ascending: true })
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false }));
 
         if (error) throw error;
 
         const foldersWithCount = await Promise.all(folders.map(async (folder) => {
-            const { count: channelCount } = await supabase
+            const { count: channelCount } = await withRetry(() => supabase
                 .from('channels')
                 .select('*', { count: 'exact', head: true })
-                .eq('folder_id', folder.id);
+                .eq('folder_id', folder.id));
 
-            const { count: videoCount } = await supabase
+            const { count: videoCount } = await withRetry(() => supabase
                 .from('videos')
                 .select('*', { count: 'exact', head: true })
-                .eq('folder_id', folder.id);
+                .eq('folder_id', folder.id));
 
             return { ...folder, channel_count: channelCount || 0, video_count: videoCount || 0 };
         }));
@@ -465,31 +505,31 @@ export const foldersApi = {
     },
 
     getById: async (id) => {
-        const { data: folder, error } = await supabase.from('folders').select('*').eq('id', id).single();
+        const { data: folder, error } = await withRetry(() => supabase.from('folders').select('*').eq('id', id).single());
         if (error) throw error;
 
-        const { data: channels } = await supabase
+        const { data: channels } = await withRetry(() => supabase
             .from('channels')
             .select('*')
             .eq('folder_id', id)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false }));
 
         const channelsWithCount = await Promise.all((channels || []).map(async (channel) => {
-            const { count } = await supabase
+            const { count } = await withRetry(() => supabase
                 .from('videos')
                 .select('*', { count: 'exact', head: true })
-                .eq('channel_id', channel.id);
+                .eq('channel_id', channel.id));
             return { ...channel, video_count: count || 0 };
         }));
 
         const channelIds = (channels || []).map(c => c.id);
         let channelVideos = [];
         if (channelIds.length > 0) {
-            const { data } = await supabase
+            const { data } = await withRetry(() => supabase
                 .from('videos')
                 .select('*, channels(title, thumbnail)')
                 .in('channel_id', channelIds)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false }));
 
             channelVideos = (data || []).map(v => ({
                 ...v,
@@ -499,12 +539,12 @@ export const foldersApi = {
             }));
         }
 
-        const { data: folderVideos } = await supabase
+        const { data: folderVideos } = await withRetry(() => supabase
             .from('videos')
             .select('*')
             .eq('folder_id', id)
             .is('channel_id', null)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false }));
 
         const directVideos = (folderVideos || []).map(v => ({
             ...v,
@@ -518,18 +558,18 @@ export const foldersApi = {
         );
 
         const videosWithTags = await Promise.all(allVideos.map(async (video) => {
-            const { data: tagData } = await supabase
+            const { data: tagData } = await withRetry(() => supabase
                 .from('video_tags')
                 .select('tags(name)')
-                .eq('video_id', video.id);
+                .eq('video_id', video.id));
             const tags = tagData?.map(t => t.tags?.name).filter(Boolean) || [];
             return { ...video, tags };
         }));
 
-        const { count: channelCount } = await supabase
+        const { count: channelCount } = await withRetry(() => supabase
             .from('channels')
             .select('*', { count: 'exact', head: true })
-            .eq('folder_id', id);
+            .eq('folder_id', id));
 
         return {
             data: {
@@ -590,10 +630,10 @@ export const foldersApi = {
 
         if (error) throw error;
 
-        const { count } = await supabase
+        const { count } = await withRetry(() => supabase
             .from('channels')
             .select('*', { count: 'exact', head: true })
-            .eq('folder_id', id);
+            .eq('folder_id', id));
 
         return { data: { ...folder, channel_count: count || 0 } };
     },
@@ -631,10 +671,10 @@ export const foldersApi = {
 // 태그 카테고리 API
 export const tagCategoriesApi = {
     getAll: async () => {
-        const { data: categories, error } = await supabase
+        const { data: categories, error } = await withRetry(() => supabase
             .from('tag_categories')
             .select('*')
-            .order('sort_order', { ascending: true });
+            .order('sort_order', { ascending: true }));
 
         if (error) throw error;
         return { data: { categories: categories || [] } };
@@ -706,21 +746,21 @@ export const tagCategoriesApi = {
 // 태그 API
 export const tagsApi = {
     getAll: async () => {
-        const { data: tags, error } = await supabase
+        const { data: tags, error } = await withRetry(() => supabase
             .from('tags')
-            .select('*, tag_categories(id, name, color)');
+            .select('*, tag_categories(id, name, color)'));
         if (error) throw error;
 
         const tagsWithCount = await Promise.all(tags.map(async (tag) => {
-            const { count: videoCount } = await supabase
+            const { count: videoCount } = await withRetry(() => supabase
                 .from('video_tags')
                 .select('*', { count: 'exact', head: true })
-                .eq('tag_id', tag.id);
+                .eq('tag_id', tag.id));
 
-            const { count: channelCount } = await supabase
+            const { count: channelCount } = await withRetry(() => supabase
                 .from('channel_tags')
                 .select('*', { count: 'exact', head: true })
-                .eq('tag_id', tag.id);
+                .eq('tag_id', tag.id));
 
             return {
                 ...tag,
@@ -736,23 +776,23 @@ export const tagsApi = {
     // 카테고리별 태그 조회
     getByCategory: async () => {
         // 모든 카테고리 가져오기
-        const { data: categories } = await supabase
+        const { data: categories } = await withRetry(() => supabase
             .from('tag_categories')
             .select('*')
-            .order('sort_order', { ascending: true });
+            .order('sort_order', { ascending: true }));
 
         // 모든 태그 가져오기
-        const { data: tags } = await supabase
+        const { data: tags } = await withRetry(() => supabase
             .from('tags')
             .select('*')
-            .order('name', { ascending: true });
+            .order('name', { ascending: true }));
 
         // 태그별 사용 횟수
         const tagsWithCount = await Promise.all((tags || []).map(async (tag) => {
-            const { count: videoCount } = await supabase
+            const { count: videoCount } = await withRetry(() => supabase
                 .from('video_tags')
                 .select('*', { count: 'exact', head: true })
-                .eq('tag_id', tag.id);
+                .eq('tag_id', tag.id));
             return { ...tag, count: videoCount || 0 };
         }));
 
@@ -794,28 +834,28 @@ export const tagsApi = {
             return { data: { suggestions: [] } };
         }
 
-        const { data: tags, error } = await supabase
+        const { data: tags, error } = await withRetry(() => supabase
             .from('tags')
             .select('name')
             .ilike('name', `%${q}%`)
             .order('name', { ascending: true })
-            .limit(10);
+            .limit(10));
 
         if (error) throw error;
         return { data: { suggestions: tags.map(t => t.name) } };
     },
 
     recommend: async (channelId) => {
-        const { data: videos } = await supabase.from('videos').select('id').eq('channel_id', channelId);
+        const { data: videos } = await withRetry(() => supabase.from('videos').select('id').eq('channel_id', channelId));
         if (!videos || videos.length === 0) {
             return { data: { recommendations: [] } };
         }
 
         const videoIds = videos.map(v => v.id);
-        const { data: videoTags } = await supabase
+        const { data: videoTags } = await withRetry(() => supabase
             .from('video_tags')
             .select('tag_id, tags(name)')
-            .in('video_id', videoIds);
+            .in('video_id', videoIds));
 
         const tagCounts = {};
         (videoTags || []).forEach(vt => {
@@ -834,10 +874,10 @@ export const tagsApi = {
     },
 
     getChannelTags: async (channelId) => {
-        const { data: tagData, error } = await supabase
+        const { data: tagData, error } = await withRetry(() => supabase
             .from('channel_tags')
             .select('tags(name)')
-            .eq('channel_id', channelId);
+            .eq('channel_id', channelId));
 
         if (error) throw error;
         return { data: { tags: (tagData || []).map(t => t.tags?.name).filter(Boolean) } };
@@ -860,10 +900,10 @@ export const tagsApi = {
             }
         }
 
-        const { data: updatedTags } = await supabase
+        const { data: updatedTags } = await withRetry(() => supabase
             .from('channel_tags')
             .select('tags(name)')
-            .eq('channel_id', channelId);
+            .eq('channel_id', channelId));
 
         return { data: { tags: (updatedTags || []).map(t => t.tags?.name).filter(Boolean) } };
     }
@@ -935,4 +975,143 @@ export const parseUrlApi = {
     }
 };
 
-export default { videosApi, channelsApi, foldersApi, tagsApi, tagCategoriesApi, parseUrlApi };
+// AI 어시스트 API
+const GEMINI_API_KEY = 'AIzaSyBP72SA8upFcS5Buykjn5oSfvfWnvDosAw';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+
+async function callGemini(prompt, maxTokens = 500) {
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.6, maxOutputTokens: maxTokens }
+        })
+    });
+    if (!response.ok) throw new Error('Gemini API 호출 실패');
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+export const aiAssistApi = {
+    refineMemo: async ({ title, description, memo }) => {
+        // Try server first, fallback to direct Gemini call
+        try {
+            const response = await fetch('/api/ai-assist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'refine-memo', title, description, memo })
+            });
+            if (response.ok) return response.json();
+        } catch (e) {
+            console.log('서버 API 실패, 클라이언트 폴백:', e.message);
+        }
+
+        // Direct Gemini call
+        const prompt = `당신은 한국어 메모를 정리하는 전문가입니다.
+사용자가 작성한 영상에 대한 메모를 받아서, 의미는 그대로 유지하면서 더 읽기 쉽고 정돈된 형태로 다듬어주세요.
+
+영상 제목: ${title || '없음'}
+영상 설명: ${description || '없음'}
+
+사용자의 메모:
+${memo}
+
+규칙:
+1. 의미와 내용은 절대 변경하지 말고, 표현만 다듬기
+2. 맞춤법과 띄어쓰기 교정
+3. 문장 구조를 더 명확하게 개선
+4. 친근하고 자연스러운 한국어 사용
+5. 메모의 길이는 원본과 비슷하게 유지
+
+다듬어진 메모만 출력해주세요. 별도의 설명이나 서두는 붙이지 마세요.`;
+
+        const result = await callGemini(prompt, 1000);
+        return { refinedMemo: result.trim() };
+    },
+
+    suggestTags: async ({ title, description, memo, existingTags }) => {
+        // Try server first, fallback to direct Gemini call
+        try {
+            const response = await fetch('/api/ai-assist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'suggest-tags', title, description, memo, existingTags })
+            });
+            if (response.ok) return response.json();
+        } catch (e) {
+            console.log('서버 API 실패, 클라이언트 폴백:', e.message);
+        }
+
+        // Direct Gemini call
+        const existingTagsList = existingTags?.length > 0 ? `\n이미 입력된 태그: ${existingTags.join(', ')}` : '';
+        const prompt = `영상 콘텐츠 분류 전문가로서, 다음 영상 정보를 분석하여 관련성 높은 한국어 태그를 5-7개 제안해주세요.
+
+영상 제목: ${title || '없음'}
+영상 설명: ${description || '없음'}
+메모: ${memo || '없음'}${existingTagsList}
+
+규칙:
+1. 영상의 핵심 주제와 관련된 태그
+2. 검색에 유용한 키워드 위주
+3. 한국어로만 작성
+4. 각 태그는 2-4 단어 이내
+5. 이미 입력된 태그와 중복 금지
+
+태그만 쉼표로 구분하여 출력해주세요.`;
+
+        const result = await callGemini(prompt, 200);
+        const tags = result.split(',').map(t => t.trim()).filter(t => t.length > 0).slice(0, 7);
+        return { suggestedTags: tags };
+    }
+};
+
+// YouTube 댓글 API
+const YOUTUBE_API_KEY = 'AIzaSyBP72SA8upFcS5Buykjn5oSfvfWnvDosAw';
+
+export const youtubeCommentsApi = {
+    getComments: async (videoUrl) => {
+        const match = videoUrl?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]+)/);
+        if (!match) return { comments: [], disabled: false };
+
+        const videoId = match[1];
+
+        // Try server first, fallback to direct YouTube API call
+        try {
+            const response = await fetch('/api/youtube-comments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ videoId })
+            });
+            if (response.ok) return response.json();
+        } catch (e) {
+            console.log('서버 API 실패, 클라이언트 폴백:', e.message);
+        }
+
+        // Direct YouTube API call
+        try {
+            const ytResponse = await fetch(
+                `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&order=relevance&maxResults=10&key=${YOUTUBE_API_KEY}`
+            );
+            if (ytResponse.status === 403) return { comments: [], disabled: true };
+            if (!ytResponse.ok) throw new Error('YouTube API 호출 실패');
+
+            const ytData = await ytResponse.json();
+            const comments = (ytData.items || []).map(item => {
+                const snippet = item.snippet?.topLevelComment?.snippet;
+                return {
+                    author: snippet?.authorDisplayName || '익명',
+                    text: snippet?.textDisplay || '',
+                    likeCount: snippet?.likeCount || 0,
+                    publishedAt: snippet?.publishedAt || ''
+                };
+            });
+            return { comments };
+        } catch (error) {
+            console.error('YouTube API 오류:', error);
+            return { comments: [], disabled: false };
+        }
+    }
+};
+
+export default { videosApi, channelsApi, foldersApi, tagsApi, tagCategoriesApi, parseUrlApi, aiAssistApi, youtubeCommentsApi };

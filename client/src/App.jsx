@@ -7,6 +7,7 @@ import ChannelDetail from './pages/ChannelDetail';
 import FolderDetail from './pages/FolderDetail';
 import AllChannelsPage from './pages/AllChannelsPage';
 import AllVideosPage from './pages/AllVideosPage';
+import BrowsePage from './pages/BrowsePage';
 
 function App() {
     return (
@@ -17,6 +18,7 @@ function App() {
                 <Route path="/folder/:id" element={<FolderDetail />} />
                 <Route path="/channels" element={<AllChannelsPage />} />
                 <Route path="/videos" element={<AllVideosPage />} />
+                <Route path="/browse" element={<BrowsePage />} />
             </Routes>
             <ToastContainer />
         </ToastProvider>

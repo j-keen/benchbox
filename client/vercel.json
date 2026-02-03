@@ -6,6 +6,9 @@
   "functions": {
     "api/parse-url.js": {
       "maxDuration": 30
+    },
+    "api/ai-assist.js": {
+      "maxDuration": 30
     }
   }
 }

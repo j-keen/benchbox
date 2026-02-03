@@ -10,6 +10,7 @@ import VideoModal from '../components/VideoModal';
 import FolderModal from '../components/FolderModal';
 import BatchTagModal from '../components/BatchTagModal';
 import QuickUrlModal from '../components/QuickUrlModal';
+import MobileAddModal from '../components/MobileAddModal';
 import TagManagerModal from '../components/TagManagerModal';
 import { VideoGridSkeleton, ChannelRowSkeleton } from '../components/Skeleton';
 import { getPlatformName } from '../utils/platformIcons';
@@ -42,6 +43,11 @@ const Home = () => {
 
     // 태그 관리 모달
     const [showTagManager, setShowTagManager] = useState(false);
+
+    // 모바일 추가 모달
+    const [showMobileAddModal, setShowMobileAddModal] = useState(false);
+    const [mobileAddPreview, setMobileAddPreview] = useState(null);
+    const [clipboardLoading, setClipboardLoading] = useState(false);
 
     // 선택 상태
     const [selectedChannels, setSelectedChannels] = useState(new Set());
@@ -160,21 +166,60 @@ const Home = () => {
                 });
                 setChannels(prev => [response.data, ...prev]);
             } else {
-                const response = await videosApi.create({
+                const createData = {
                     url: data.url,
                     channel_id: data.channel_id,
                     title: data.title,
                     thumbnail: data.thumbnail,
                     description: data.description
-                });
+                };
+                if (data.memo) createData.memo = data.memo;
+                if (data.tags && data.tags.length > 0) createData.tags = data.tags;
+                const response = await videosApi.create(createData);
                 if (!data.channel_id) {
                     setVideos(prev => [response.data, ...prev]);
                 }
             }
+            setShowMobileAddModal(false);
+            setMobileAddPreview(null);
         } catch (error) {
             console.error('저장 오류:', error);
             toast.error(error.response?.data?.error || '저장에 실패했습니다.');
         }
+    };
+
+    // 클립보드에서 URL 등록 (모바일)
+    const handleClipboardPaste = async () => {
+        try {
+            setClipboardLoading(true);
+            const text = await navigator.clipboard.readText();
+            if (!text.trim()) {
+                toast.error('클립보드가 비어있습니다.');
+                return;
+            }
+            // URL 유효성 체크
+            try {
+                new URL(text);
+            } catch {
+                toast.error('클립보드에 유효한 URL이 없습니다.');
+                return;
+            }
+            // URL 파싱
+            const response = await parseUrlApi.parse(text);
+            setMobileAddPreview(response.data);
+            setShowMobileAddModal(true);
+        } catch (error) {
+            console.error('클립보드 읽기 오류:', error);
+            toast.error('클립보드를 읽을 수 없습니다. URL을 직접 입력해주세요.');
+        } finally {
+            setClipboardLoading(false);
+        }
+    };
+
+    // UrlInput에서 미리보기 완료 후 모바일 모달 열기
+    const handleUrlPreviewForMobile = (preview) => {
+        setMobileAddPreview(preview);
+        setShowMobileAddModal(true);
     };
 
     // 채널 클릭 처리
@@ -379,7 +424,10 @@ const Home = () => {
             key: 'Escape',
             action: () => {
                 // 모달 닫기 우선
-                if (selectedVideo) {
+                if (showMobileAddModal) {
+                    setShowMobileAddModal(false);
+                    setMobileAddPreview(null);
+                } else if (selectedVideo) {
                     setSelectedVideo(null);
                 } else if (showFolderModal) {
                     setShowFolderModal(false);
@@ -593,51 +641,89 @@ const Home = () => {
         <div className="min-h-screen bg-gray-50">
             {/* 헤더 */}
             <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-                <div className="max-w-7xl mx-auto px-4 py-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <h1 className="text-xl font-bold text-gray-900">BenchBox</h1>
-                        {/* 검색창 + 태그 관리 */}
-                        <div className="flex items-center gap-2">
-                            <div className="relative flex-1 sm:flex-none">
-                                <input
-                                    ref={searchInputRef}
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder={`${getActiveFolderName()}에서 검색... (Ctrl+K)`}
-                                    className="w-full sm:w-64 pl-9 pr-3 py-2.5 sm:py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                />
-                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                                {searchQuery && (
-                                    <button
-                                        onClick={() => setSearchQuery('')}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                )}
-                            </div>
-                            {/* 태그 관리 버튼 */}
-                            <button
-                                onClick={() => setShowTagManager(true)}
-                                className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors"
-                                title="태그 관리"
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                </svg>
-                            </button>
+                <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-4">
+                    {/* 모바일: 한 줄에 로고 + 검색 + 태그관리 */}
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-lg sm:text-xl font-bold text-gray-900 flex-shrink-0">BenchBox</h1>
+                        {/* 검색창 */}
+                        <div className="relative flex-1">
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder={`검색... (Ctrl+K)`}
+                                className="w-full sm:w-64 pl-8 pr-3 py-2 sm:py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            />
+                            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
                         </div>
+                        {/* 태그 관리 버튼 */}
+                        <button
+                            onClick={() => setShowTagManager(true)}
+                            className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+                            title="태그 관리"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            </svg>
+                        </button>
                     </div>
 
-                    {/* URL 입력 */}
-                    <div className="mt-4">
+                    {/* 모바일: 폴더/채널 추가 + 클립보드 등록 버튼 (균등 크기) */}
+                    <div className="sm:hidden mt-2 flex items-center gap-2">
+                        <button
+                            onClick={() => {
+                                setEditingFolder(null);
+                                setShowFolderModal(true);
+                            }}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-sm font-medium rounded-lg transition-colors min-h-[44px]"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                            </svg>
+                            폴더
+                        </button>
+                        <button
+                            onClick={() => setShowChannelUrlModal(true)}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-sm font-medium rounded-lg transition-colors min-h-[44px]"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                            </svg>
+                            채널
+                        </button>
+                        <button
+                            onClick={handleClipboardPaste}
+                            disabled={clipboardLoading}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-primary-500 hover:bg-primary-600 disabled:bg-primary-300 text-white text-sm font-medium rounded-lg transition-colors min-h-[44px]"
+                        >
+                            {clipboardLoading ? (
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                </svg>
+                            )}
+                            URL 등록
+                        </button>
+                    </div>
+                    {/* 데스크탑/태블릿: URL 입력 */}
+                    <div className="hidden sm:block mt-4">
                         <UrlInput
                             onSave={handleSaveUrl}
+                            onPreview={handleUrlPreviewForMobile}
                             channels={channels}
                         />
                     </div>
@@ -735,26 +821,35 @@ const Home = () => {
                 )}
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 py-6">
+            <main className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-6">
                 {/* 빠른 네비게이션 */}
-                <div className="mb-6 flex items-center gap-3">
+                <div className="mb-3 sm:mb-6 flex items-center gap-1.5 sm:gap-3 overflow-x-auto scrollbar-hide">
                     <Link
                         to="/channels"
-                        className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-colors"
+                        className="flex-shrink-0 flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-colors"
                     >
-                        <svg className="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 h-4 sm:w-5 sm:h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
-                        <span className="text-sm font-medium text-gray-700">전체 채널</span>
+                        <span className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">채널</span>
                     </Link>
                     <Link
                         to="/videos"
-                        className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-colors"
+                        className="flex-shrink-0 flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-colors"
                     >
-                        <svg className="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 h-4 sm:w-5 sm:h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                         </svg>
-                        <span className="text-sm font-medium text-gray-700">전체 영상</span>
+                        <span className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">영상</span>
+                    </Link>
+                    <Link
+                        to="/browse"
+                        className="flex-shrink-0 flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-colors"
+                    >
+                        <svg className="w-4 h-4 sm:w-5 sm:h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                        <span className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">폴더</span>
                     </Link>
                 </div>
 
@@ -762,25 +857,23 @@ const Home = () => {
                 <section className="mb-8">
                     {/* 섹션 헤더 - 개선됨 */}
                     <div className="mb-4">
-                        {/* 상단: 타이틀 + 액션 버튼 */}
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-                            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                                    <span>꿀통채널</span>
-                                    <span className="text-xs sm:text-sm font-normal text-gray-500">
-                                        {folders.length}개 폴더 · {channels.length}개 채널
-                                    </span>
-                                </h2>
-                            </div>
+                        {/* 상단: 타이틀 + 액션 버튼 (데스크탑만) */}
+                        <div className="flex items-center justify-between mb-3">
+                            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                                <span>꿀통채널</span>
+                                <span className="text-xs sm:text-sm font-normal text-gray-500">
+                                    {folders.length}개 폴더 · {channels.length}개 채널
+                                </span>
+                            </h2>
 
-                            {/* 추가 버튼 그룹 - 항상 보임 */}
-                            <div className="flex items-center gap-2">
+                            {/* 추가 버튼 그룹 - 데스크탑만 표시 */}
+                            <div className="hidden sm:flex items-center gap-2">
                                 <button
                                     onClick={() => {
                                         setEditingFolder(null);
                                         setShowFolderModal(true);
                                     }}
-                                    className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors min-h-[44px] sm:min-h-0"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
                                 >
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
@@ -789,7 +882,7 @@ const Home = () => {
                                 </button>
                                 <button
                                     onClick={() => setShowChannelUrlModal(true)}
-                                    className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors min-h-[44px] sm:min-h-0"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors"
                                 >
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
@@ -973,16 +1066,6 @@ const Home = () => {
                                 </select>
                             </div>
 
-                            {/* 영상 추가 버튼 */}
-                            <button
-                                onClick={() => setShowVideoUrlModal(true)}
-                                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors min-h-[44px] sm:min-h-0 w-full sm:w-auto"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                영상 추가
-                            </button>
                         </div>
                     </div>
 
@@ -990,7 +1073,7 @@ const Home = () => {
                     {loading ? (
                         <VideoGridSkeleton count={10} />
                     ) : videos.length > 0 ? (
-                        <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-4 space-y-4">
+                        <div className="columns-3 md:columns-4 lg:columns-5 gap-2 sm:gap-4 space-y-2 sm:space-y-4">
                             {videos.map(video => (
                                 <div key={video.id} className="break-inside-avoid">
                                     <VideoCard
@@ -1079,6 +1162,19 @@ const Home = () => {
                 isOpen={showTagManager}
                 onClose={() => setShowTagManager(false)}
             />
+
+            {/* 모바일 추가 모달 */}
+            {showMobileAddModal && mobileAddPreview && (
+                <MobileAddModal
+                    preview={mobileAddPreview}
+                    channels={channels}
+                    onSave={handleSaveUrl}
+                    onClose={() => {
+                        setShowMobileAddModal(false);
+                        setMobileAddPreview(null);
+                    }}
+                />
+            )}
         </div>
     );
 };

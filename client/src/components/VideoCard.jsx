@@ -188,7 +188,7 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
             </div>
 
             {/* 정보 */}
-            <div className="p-3">
+            <div className="p-2 sm:p-3">
                 <h3 className="font-medium text-gray-900 line-clamp-2 text-sm leading-5">
                     {video.title || 'Untitled'}
                 </h3>

@@ -342,7 +342,7 @@ const ChannelCard = ({ channel, onClick, isSelected, onSelect, selectionMode, on
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onContextMenu={(e) => e.preventDefault()}
-            className={`flex-shrink-0 w-36 sm:w-44 bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer card-hover border-2 transition-all select-none ${
+            className={`flex-shrink-0 w-28 sm:w-44 bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer card-hover border-2 transition-all select-none ${
                 isSelected ? 'border-primary-500 ring-2 ring-primary-200' :
                 isDragOver ? 'border-green-500 ring-2 ring-green-200 scale-105' : 'border-transparent'
             } ${isDragging ? 'opacity-50 scale-95' : ''}`}
@@ -464,7 +464,7 @@ const ChannelCard = ({ channel, onClick, isSelected, onSelect, selectionMode, on
 export const AddChannelCard = ({ onClick }) => (
     <div
         onClick={onClick}
-        className="flex-shrink-0 w-36 sm:w-44 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 cursor-pointer hover:border-primary-400 hover:bg-primary-50 transition-colors"
+        className="flex-shrink-0 w-28 sm:w-44 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 cursor-pointer hover:border-primary-400 hover:bg-primary-50 transition-colors"
     >
         <div className="aspect-square flex flex-col items-center justify-center text-gray-400 hover:text-primary-500">
             <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">

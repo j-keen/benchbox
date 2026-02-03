@@ -4,7 +4,6 @@ import { videosApi, channelsApi, tagsApi, foldersApi, parseUrlApi } from '../uti
 import { useToast } from '../contexts/ToastContext';
 import { useGlobalPaste } from '../hooks/useKeyboardShortcuts';
 import VideoCard from '../components/VideoCard';
-import UrlInput from '../components/UrlInput';
 import VideoModal from '../components/VideoModal';
 import { getPlatformIcon, getPlatformColor, getPlatformName } from '../utils/platformIcons';
 
@@ -42,6 +41,7 @@ const ChannelDetail = () => {
     // 선택 상태
     const [selectedVideos, setSelectedVideos] = useState(new Set());
     const [selectionMode, setSelectionMode] = useState(false);
+    const [clipboardLoading, setClipboardLoading] = useState(false);
 
     // 선택 모드 토글
     useEffect(() => {
@@ -121,6 +121,40 @@ const ChannelDetail = () => {
         } catch (error) {
             console.error('저장 오류:', error);
             toast.error(error.response?.data?.error || '저장에 실패했습니다.');
+        }
+    };
+
+    // 클립보드에서 URL 등록
+    const handleClipboardPaste = async () => {
+        try {
+            setClipboardLoading(true);
+            const text = await navigator.clipboard.readText();
+            if (!text.trim()) {
+                toast.error('클립보드가 비어있습니다.');
+                return;
+            }
+            try {
+                new URL(text);
+            } catch {
+                toast.error('클립보드에 유효한 URL이 없습니다.');
+                return;
+            }
+            const parseResult = await parseUrlApi.parse(text);
+            const parsed = parseResult.data;
+            const response = await videosApi.create({
+                url: text,
+                channel_id: parseInt(id),
+                title: parsed.title,
+                thumbnail: parsed.thumbnail,
+                description: parsed.description
+            });
+            setVideos(prev => [response.data, ...prev]);
+            toast.success('영상이 등록되었습니다.');
+        } catch (error) {
+            console.error('클립보드 읽기 오류:', error);
+            toast.error('클립보드를 읽을 수 없습니다.');
+        } finally {
+            setClipboardLoading(false);
         }
     };
 
@@ -307,13 +341,44 @@ const ChannelDetail = () => {
                         <h1 className="text-xl font-bold text-gray-900">BenchBox</h1>
                     </div>
 
-                    {/* URL 입력 */}
-                    <div className="mt-4">
-                        <UrlInput
-                            onSave={handleSaveUrl}
-                            currentChannelId={parseInt(id)}
-                            channels={allChannels}
-                        />
+                    {/* 클립보드 URL 등록 + 채널 내 검색 */}
+                    <div className="mt-3 flex items-center gap-2">
+                        <button
+                            onClick={handleClipboardPaste}
+                            disabled={clipboardLoading}
+                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-primary-500 hover:bg-primary-600 disabled:bg-primary-300 text-white text-sm font-medium rounded-lg transition-colors min-h-[44px]"
+                        >
+                            {clipboardLoading ? (
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                </svg>
+                            )}
+                            URL 등록
+                        </button>
+                        <div className="relative flex-1">
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="이 채널에서 검색..."
+                                className="w-full pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            />
+                            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -623,35 +688,11 @@ const ChannelDetail = () => {
                                 <option value="title">제목순</option>
                             </select>
                         </div>
-
-                        {/* 검색창 */}
-                        <div className="relative">
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="이 채널에서 검색... (제목, 메모, 태그)"
-                                className="w-full pl-9 pr-8 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                            />
-                            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                            {searchQuery && (
-                                <button
-                                    onClick={() => setSearchQuery('')}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
-                                >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            )}
-                        </div>
                     </div>
 
                     {/* 영상 그리드 - Masonry 레이아웃 */}
                     {videos.length > 0 ? (
-                        <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-4 space-y-4">
+                        <div className="columns-3 sm:columns-3 md:columns-4 lg:columns-5 gap-2 sm:gap-4 space-y-2 sm:space-y-4">
                             {videos.map(video => (
                                 <div key={video.id} className="break-inside-avoid">
                                     <VideoCard

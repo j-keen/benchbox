@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { parseUrlApi } from '../utils/api';
 import { getPlatformIcon, getPlatformColor, getPlatformName } from '../utils/platformIcons';
 
-const UrlInput = ({ onSave, currentChannelId = null, channels = [] }) => {
+const UrlInput = ({ onSave, onPreview, currentChannelId = null, channels = [] }) => {
     const [url, setUrl] = useState('');
     const [loading, setLoading] = useState(false);
     const [preview, setPreview] = useState(null);
@@ -29,8 +29,15 @@ const UrlInput = ({ onSave, currentChannelId = null, channels = [] }) => {
         setLoading(true);
         try {
             const response = await parseUrlApi.parse(pastedUrl);
-            setPreview(response.data);
-            setSelectedChannelId(currentChannelId);
+            // 모바일에서 onPreview가 있으면 MobileAddModal로 전달
+            if (onPreview && window.innerWidth < 640) {
+                onPreview(response.data);
+                setUrl('');
+                setPreview(null);
+            } else {
+                setPreview(response.data);
+                setSelectedChannelId(currentChannelId);
+            }
         } catch (err) {
             console.error('URL 파싱 오류:', err);
             setError(err.response?.data?.error || '정보를 가져올 수 없습니다.');
