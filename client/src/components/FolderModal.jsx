@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 
 const FOLDER_COLORS = [
     '#6366f1', // indigo
@@ -17,30 +17,6 @@ const FolderModal = ({ folder, onSave, onClose }) => {
     const [name, setName] = useState(folder?.name || '');
     const [color, setColor] = useState(folder?.color || FOLDER_COLORS[0]);
     const [description, setDescription] = useState(folder?.description || '');
-    const [coverImage, setCoverImage] = useState(folder?.cover_image || '');
-    const [coverPreview, setCoverPreview] = useState(folder?.cover_image || '');
-    const fileInputRef = useRef(null);
-
-    const handleImageChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            // 파일을 Base64로 변환
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setCoverImage(reader.result);
-                setCoverPreview(reader.result);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const handleRemoveImage = () => {
-        setCoverImage('');
-        setCoverPreview('');
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
-    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -48,8 +24,7 @@ const FolderModal = ({ folder, onSave, onClose }) => {
         onSave({
             name: name.trim(),
             color,
-            description: description.trim() || null,
-            cover_image: coverImage || null
+            description: description.trim() || null
         });
     };
 
@@ -62,54 +37,6 @@ const FolderModal = ({ folder, onSave, onClose }) => {
                     </h2>
 
                     <form onSubmit={handleSubmit}>
-                        {/* 커버 이미지 */}
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                커버 이미지
-                            </label>
-                            <div
-                                className="relative aspect-video rounded-lg overflow-hidden border-2 border-dashed border-gray-200 cursor-pointer hover:border-primary-400 transition-colors"
-                                style={{ backgroundColor: coverPreview ? 'transparent' : color }}
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                {coverPreview ? (
-                                    <>
-                                        <img
-                                            src={coverPreview}
-                                            alt="커버 미리보기"
-                                            className="w-full h-full object-cover"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleRemoveImage();
-                                            }}
-                                            className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </>
-                                ) : (
-                                    <div className="w-full h-full flex flex-col items-center justify-center text-white/70">
-                                        <svg className="w-10 h-10 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                        <span className="text-sm">클릭하여 이미지 업로드</span>
-                                    </div>
-                                )}
-                            </div>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageChange}
-                                className="hidden"
-                            />
-                        </div>
-
                         {/* 폴더 이름 */}
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -162,37 +89,17 @@ const FolderModal = ({ folder, onSave, onClose }) => {
                         {/* 미리보기 */}
                         <div className="mb-6 p-3 bg-gray-50 rounded-lg">
                             <span className="text-sm text-gray-500 block mb-2">미리보기</span>
-                            <div className="flex items-start gap-3">
-                                <div
-                                    className="w-12 h-12 rounded-lg flex-shrink-0 overflow-hidden"
-                                    style={{ backgroundColor: coverPreview ? 'transparent' : color }}
-                                >
-                                    {coverPreview ? (
-                                        <img src={coverPreview} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center">
-                                            <svg className="w-6 h-6 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                                            </svg>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                        <span
-                                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                                            style={{ backgroundColor: color }}
-                                        />
-                                        <span className="font-medium text-gray-900 truncate">
-                                            {name || '폴더 이름'}
-                                        </span>
-                                    </div>
-                                    {description && (
-                                        <p className="mt-0.5 text-xs text-gray-500 line-clamp-1">
-                                            {description}
-                                        </p>
-                                    )}
-                                </div>
+                            <div className="flex items-center gap-2.5">
+                                <span
+                                    className="w-4 h-4 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: color }}
+                                />
+                                <span className="font-medium text-gray-900 truncate">
+                                    {name || '폴더 이름'}
+                                </span>
+                                {description && (
+                                    <span className="text-xs text-gray-400 truncate">— {description}</span>
+                                )}
                             </div>
                         </div>
 

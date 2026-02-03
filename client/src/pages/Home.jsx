@@ -4,7 +4,6 @@ import { videosApi, channelsApi, tagsApi, foldersApi, parseUrlApi } from '../uti
 import { useToast } from '../contexts/ToastContext';
 import { useKeyboardShortcuts, useGlobalPaste } from '../hooks/useKeyboardShortcuts';
 import VideoCard from '../components/VideoCard';
-import ChannelCard, { AddChannelCard } from '../components/ChannelCard';
 import UrlInput from '../components/UrlInput';
 import VideoModal from '../components/VideoModal';
 import FolderModal from '../components/FolderModal';
@@ -13,12 +12,10 @@ import QuickUrlModal from '../components/QuickUrlModal';
 import MobileAddModal from '../components/MobileAddModal';
 import TagManagerModal from '../components/TagManagerModal';
 import FABMenu from '../components/FABMenu';
-import { VideoGridSkeleton, ChannelRowSkeleton } from '../components/Skeleton';
-import { getPlatformName } from '../utils/platformIcons';
+import { VideoGridSkeleton } from '../components/Skeleton';
 
 const Home = () => {
     const navigate = useNavigate();
-    const channelScrollRef = useRef(null);
     const searchInputRef = useRef(null);
     const toast = useToast();
 
@@ -32,6 +29,11 @@ const Home = () => {
 
     // 폴더 상태
     const [activeFolder, setActiveFolder] = useState(null); // null = 전체, 'unfiled' = 미분류
+    const [activeChannel, setActiveChannel] = useState(null);
+
+    // 드롭다운 상태
+    const [folderDropdownOpen, setFolderDropdownOpen] = useState(false);
+    const [channelDropdownOpen, setChannelDropdownOpen] = useState(false);
     const [showFolderModal, setShowFolderModal] = useState(false);
     const [editingFolder, setEditingFolder] = useState(null);
 
@@ -64,7 +66,7 @@ const Home = () => {
     // 데이터 로드
     useEffect(() => {
         loadData();
-    }, [sortBy, searchQuery, activeFolder, showUnassignedOnly]);
+    }, [sortBy, searchQuery, activeFolder, activeChannel, showUnassignedOnly]);
 
     // 선택 모드 토글
     useEffect(() => {
@@ -99,6 +101,11 @@ const Home = () => {
                 // 폴더의 영상들 필터링 적용
                 let folderVideos = folderRes.data.videos || [];
 
+                // 채널 필터
+                if (activeChannel) {
+                    folderVideos = folderVideos.filter(v => v.channel_id === activeChannel);
+                }
+
                 // 검색 필터
                 if (searchQuery) {
                     const query = searchQuery.toLowerCase();
@@ -127,6 +134,11 @@ const Home = () => {
                     sort: sortBy,
                     search: searchQuery || undefined
                 };
+
+                // 채널 필터
+                if (activeChannel) {
+                    videoParams.channel_id = activeChannel;
+                }
 
                 // 미분류 선택 시 channel_id와 folder_id 둘 다 null인 영상만
                 if (activeFolder === 'unfiled') {
@@ -310,6 +322,7 @@ const Home = () => {
     // 폴더 클릭 처리 (필터 탭으로 변경)
     const handleFolderTabClick = (folderId) => {
         setActiveFolder(folderId);
+        setActiveChannel(null); // 폴더 변경 시 채널 필터 초기화
     };
 
     // 폴더 편집 처리
@@ -425,7 +438,11 @@ const Home = () => {
             key: 'Escape',
             action: () => {
                 // 모달 닫기 우선
-                if (showMobileAddModal) {
+                if (folderDropdownOpen) {
+                    setFolderDropdownOpen(false);
+                } else if (channelDropdownOpen) {
+                    setChannelDropdownOpen(false);
+                } else if (showMobileAddModal) {
                     setShowMobileAddModal(false);
                     setMobileAddPreview(null);
                 } else if (selectedVideo) {
@@ -775,219 +792,625 @@ const Home = () => {
             </header>
 
             <main className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-6">
-                {/* 꿀통채널 섹션 */}
-                <section className="mb-8">
-                    {/* 섹션 헤더 - 개선됨 */}
-                    <div className="mb-4">
-                        {/* 상단: 타이틀 + 액션 버튼 (데스크탑만) */}
-                        <div className="flex items-center justify-between mb-3">
-                            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                                <span>꿀통채널</span>
-                                <span className="text-xs sm:text-sm font-normal text-gray-500">
-                                    {folders.length}개 폴더 · {channels.length}개 채널
+                {/* 필터 바 */}
+                <div className="mb-5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/* 폴더 드롭다운 */}
+                        <div className="relative">
+                            <button
+                                onClick={() => { setFolderDropdownOpen(!folderDropdownOpen); setChannelDropdownOpen(false); }}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                                    activeFolder !== null
+                                        ? 'bg-primary-500 text-white shadow-sm'
+                                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                                }`}
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                </svg>
+                                <span className="max-w-[120px] truncate">
+                                    {activeFolder === null
+                                        ? '전체 폴더'
+                                        : activeFolder === 'unfiled'
+                                            ? '미분류'
+                                            : folders.find(f => f.id === activeFolder)?.name || '폴더'
+                                    }
                                 </span>
-                            </h2>
+                                <svg className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${folderDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
 
-                            {/* 추가 버튼 그룹 - 데스크탑만 표시 */}
-                            <div className="hidden sm:flex items-center gap-2">
-                                <button
-                                    onClick={() => {
-                                        setEditingFolder(null);
-                                        setShowFolderModal(true);
-                                    }}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-                                >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                                    </svg>
-                                    폴더
-                                </button>
-                                <button
-                                    onClick={() => setShowChannelUrlModal(true)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors"
-                                >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                                    </svg>
-                                    채널
-                                </button>
-                            </div>
+                            {folderDropdownOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setFolderDropdownOpen(false)} />
+
+                                    {/* 데스크탑: 드롭다운 */}
+                                    <div className="hidden sm:block absolute left-0 top-full mt-2 w-72 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 max-h-96 overflow-y-auto">
+                                        {/* 전체 */}
+                                        <button
+                                            onClick={() => {
+                                                setActiveFolder(null);
+                                                setActiveChannel(null);
+                                                setFolderDropdownOpen(false);
+                                            }}
+                                            className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3 ${
+                                                activeFolder === null ? 'bg-primary-50 text-primary-600 font-medium' : 'text-gray-700'
+                                            }`}
+                                        >
+                                            <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                                <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                                </svg>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-medium">전체</div>
+                                                <div className="text-xs text-gray-400">모든 폴더의 콘텐츠</div>
+                                            </div>
+                                        </button>
+
+                                        <div className="border-t border-gray-100"></div>
+
+                                        {folders.map(folder => (
+                                            <div
+                                                key={folder.id}
+                                                className={`group w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3 cursor-pointer ${
+                                                    activeFolder === folder.id ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
+                                                }`}
+                                                onClick={() => {
+                                                    handleFolderTabClick(folder.id);
+                                                    setActiveChannel(null);
+                                                    setFolderDropdownOpen(false);
+                                                }}
+                                                onDragOver={(e) => {
+                                                    e.preventDefault();
+                                                    e.dataTransfer.dropEffect = 'move';
+                                                    e.currentTarget.classList.add('bg-green-50');
+                                                }}
+                                                onDragLeave={(e) => {
+                                                    e.currentTarget.classList.remove('bg-green-50');
+                                                }}
+                                                onDrop={(e) => {
+                                                    e.preventDefault();
+                                                    e.currentTarget.classList.remove('bg-green-50');
+                                                    const channelData = e.dataTransfer.getData('channel');
+                                                    if (channelData) {
+                                                        handleChannelDropToFolder(JSON.parse(channelData), folder);
+                                                        return;
+                                                    }
+                                                    const videoData = e.dataTransfer.getData('video');
+                                                    if (videoData) {
+                                                        handleVideoDropToFolder(JSON.parse(videoData), folder);
+                                                    }
+                                                }}
+                                            >
+                                                <div
+                                                    className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                                                    style={{ backgroundColor: folder.color ? `${folder.color}20` : '#f3f4f6' }}
+                                                >
+                                                    <span
+                                                        className="w-3 h-3 rounded-full"
+                                                        style={{ backgroundColor: folder.color || '#9ca3af' }}
+                                                    />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-medium truncate">{folder.name}</div>
+                                                    <div className="text-xs text-gray-400">
+                                                        {folder.channel_count || 0}개 채널
+                                                        {(folder.video_count || 0) > 0 && ` · ${folder.video_count}개 영상`}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleFolderEdit(folder);
+                                                        setFolderDropdownOpen(false);
+                                                    }}
+                                                    className="p-1.5 rounded-lg hover:bg-gray-200 sm:opacity-0 sm:group-hover:opacity-100 transition-all text-gray-400 hover:text-gray-600"
+                                                    title="폴더 수정"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        ))}
+
+                                        {/* 미분류 */}
+                                        <button
+                                            onClick={() => {
+                                                handleFolderTabClick('unfiled');
+                                                setActiveChannel(null);
+                                                setFolderDropdownOpen(false);
+                                            }}
+                                            className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3 ${
+                                                activeFolder === 'unfiled' ? 'bg-gray-100 text-gray-800 font-medium' : 'text-gray-700'
+                                            }`}
+                                        >
+                                            <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+                                                <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8" />
+                                                </svg>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-medium">미분류</div>
+                                                <div className="text-xs text-gray-400">폴더에 속하지 않은 항목</div>
+                                            </div>
+                                        </button>
+
+                                        <div className="border-t border-gray-100 sticky bottom-0 bg-white">
+                                            <button
+                                                onClick={() => {
+                                                    setEditingFolder(null);
+                                                    setShowFolderModal(true);
+                                                    setFolderDropdownOpen(false);
+                                                }}
+                                                className="w-full text-left px-4 py-3 text-sm text-primary-500 hover:bg-primary-50 transition-colors flex items-center gap-3"
+                                            >
+                                                <div className="w-9 h-9 bg-primary-50 rounded-full flex items-center justify-center flex-shrink-0">
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                    </svg>
+                                                </div>
+                                                <span className="font-medium">새 폴더 만들기</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* 모바일: 바텀시트 */}
+                                    <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl max-h-[60vh] overflow-hidden flex flex-col animate-slide-up">
+                                        <div className="flex justify-center py-3 flex-shrink-0">
+                                            <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+                                        </div>
+                                        <div className="px-4 pb-2 flex-shrink-0">
+                                            <h3 className="text-base font-semibold text-gray-900">폴더 선택</h3>
+                                            <p className="text-xs text-gray-400 mt-0.5">폴더를 선택하면 해당 폴더의 콘텐츠만 표시됩니다</p>
+                                        </div>
+
+                                        <div className="overflow-y-auto flex-1 pb-safe">
+                                            <button
+                                                onClick={() => {
+                                                    setActiveFolder(null);
+                                                    setActiveChannel(null);
+                                                    setFolderDropdownOpen(false);
+                                                }}
+                                                className={`w-full text-left px-4 py-3.5 text-sm flex items-center gap-3 active:bg-gray-100 ${
+                                                    activeFolder === null ? 'bg-primary-50 text-primary-600 font-medium' : 'text-gray-700'
+                                                }`}
+                                            >
+                                                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                                    <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                                    </svg>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-medium">전체</div>
+                                                    <div className="text-xs text-gray-400">모든 폴더의 콘텐츠</div>
+                                                </div>
+                                                {activeFolder === null && (
+                                                    <svg className="w-5 h-5 text-primary-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                    </svg>
+                                                )}
+                                            </button>
+
+                                            <div className="border-t border-gray-100"></div>
+
+                                            {folders.map(folder => (
+                                                <div
+                                                    key={folder.id}
+                                                    onClick={() => {
+                                                        handleFolderTabClick(folder.id);
+                                                        setActiveChannel(null);
+                                                        setFolderDropdownOpen(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3.5 text-sm flex items-center gap-3 active:bg-gray-100 cursor-pointer ${
+                                                        activeFolder === folder.id ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
+                                                    }`}
+                                                >
+                                                    <div
+                                                        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                                                        style={{ backgroundColor: folder.color ? `${folder.color}20` : '#f3f4f6' }}
+                                                    >
+                                                        <span
+                                                            className="w-4 h-4 rounded-full"
+                                                            style={{ backgroundColor: folder.color || '#9ca3af' }}
+                                                        />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="font-medium truncate">{folder.name}</div>
+                                                        <div className="text-xs text-gray-400">
+                                                            {folder.channel_count || 0}개 채널
+                                                            {(folder.video_count || 0) > 0 && ` · ${folder.video_count}개 영상`}
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleFolderEdit(folder);
+                                                            setFolderDropdownOpen(false);
+                                                        }}
+                                                        className="p-2 rounded-lg active:bg-gray-200 text-gray-400"
+                                                        title="폴더 수정"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                        </svg>
+                                                    </button>
+                                                    {activeFolder === folder.id && (
+                                                        <svg className="w-5 h-5 text-primary-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                        </svg>
+                                                    )}
+                                                </div>
+                                            ))}
+
+                                            <button
+                                                onClick={() => {
+                                                    handleFolderTabClick('unfiled');
+                                                    setActiveChannel(null);
+                                                    setFolderDropdownOpen(false);
+                                                }}
+                                                className={`w-full text-left px-4 py-3.5 text-sm flex items-center gap-3 active:bg-gray-100 ${
+                                                    activeFolder === 'unfiled' ? 'bg-gray-100 text-gray-800 font-medium' : 'text-gray-700'
+                                                }`}
+                                            >
+                                                <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+                                                    <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8" />
+                                                    </svg>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-medium">미분류</div>
+                                                    <div className="text-xs text-gray-400">폴더에 속하지 않은 항목</div>
+                                                </div>
+                                                {activeFolder === 'unfiled' && (
+                                                    <svg className="w-5 h-5 text-gray-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                    </svg>
+                                                )}
+                                            </button>
+
+                                            <div className="border-t border-gray-100">
+                                                <button
+                                                    onClick={() => {
+                                                        setEditingFolder(null);
+                                                        setShowFolderModal(true);
+                                                        setFolderDropdownOpen(false);
+                                                    }}
+                                                    className="w-full text-left px-4 py-3.5 text-sm text-primary-500 flex items-center gap-3 active:bg-primary-50"
+                                                >
+                                                    <div className="w-10 h-10 bg-primary-50 rounded-full flex items-center justify-center flex-shrink-0">
+                                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                        </svg>
+                                                    </div>
+                                                    <span className="font-medium">새 폴더 만들기</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
 
-                        {/* 폴더 탭 (필터) - 분리됨 */}
-                        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
-                            {/* 전체 탭 */}
+                        {/* 채널 드롭다운 */}
+                        <div className="relative">
                             <button
-                                onClick={() => handleFolderTabClick(null)}
-                                className={`flex-shrink-0 px-4 py-2.5 sm:py-2 rounded-full text-sm font-medium transition-all duration-200 min-h-[44px] sm:min-h-0 snap-start ${
-                                    activeFolder === null
-                                        ? 'bg-primary-500 text-white shadow-md'
+                                onClick={() => { setChannelDropdownOpen(!channelDropdownOpen); setFolderDropdownOpen(false); }}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                                    activeChannel
+                                        ? 'bg-emerald-500 text-white shadow-sm'
                                         : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
                                 }`}
                             >
-                                전체
-                            </button>
-
-                            {/* 폴더 탭들 */}
-                            {folders.map(folder => (
-                                <div
-                                    key={folder.id}
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={() => handleFolderTabClick(folder.id)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            handleFolderTabClick(folder.id);
-                                        }
-                                    }}
-                                    onDragOver={(e) => {
-                                        e.preventDefault();
-                                        e.dataTransfer.dropEffect = 'move';
-                                        e.currentTarget.classList.add('ring-2', 'ring-green-400', 'scale-105');
-                                    }}
-                                    onDragLeave={(e) => {
-                                        e.currentTarget.classList.remove('ring-2', 'ring-green-400', 'scale-105');
-                                    }}
-                                    onDrop={(e) => {
-                                        e.preventDefault();
-                                        e.currentTarget.classList.remove('ring-2', 'ring-green-400', 'scale-105');
-                                        const channelData = e.dataTransfer.getData('channel');
-                                        if (channelData) {
-                                            const channel = JSON.parse(channelData);
-                                            handleChannelDropToFolder(channel, folder);
-                                            return;
-                                        }
-                                        const videoData = e.dataTransfer.getData('video');
-                                        if (videoData) {
-                                            const video = JSON.parse(videoData);
-                                            handleVideoDropToFolder(video, folder);
-                                        }
-                                    }}
-                                    className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-full text-sm font-medium transition-all duration-200 group min-h-[44px] sm:min-h-0 snap-start cursor-pointer ${
-                                        activeFolder === folder.id
-                                            ? 'bg-primary-500 text-white shadow-md'
-                                            : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-                                    }`}
-                                >
-                                    <span
-                                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                                        style={{ backgroundColor: activeFolder === folder.id ? 'white' : folder.color }}
+                                {activeChannel && channels.find(c => c.id === activeChannel)?.thumbnail ? (
+                                    <img
+                                        src={channels.find(c => c.id === activeChannel)?.thumbnail}
+                                        alt=""
+                                        className="w-5 h-5 rounded-full object-cover"
                                     />
-                                    <span className="truncate max-w-[80px] sm:max-w-[100px]">{folder.name}</span>
-                                    <span className={`text-xs ${activeFolder === folder.id ? 'opacity-70' : 'text-gray-400'}`}>
-                                        {folder.channel_count || 0}
-                                        {(folder.video_count || 0) > 0 && `+${folder.video_count}`}
-                                    </span>
-                                    {/* 폴더 편집 버튼 (호버 시 / 모바일에서는 항상 표시) */}
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleFolderEdit(folder);
-                                        }}
-                                        className={`ml-1 p-1 rounded sm:opacity-0 sm:group-hover:opacity-100 transition-opacity ${
-                                            activeFolder === folder.id ? 'hover:bg-white/20' : 'hover:bg-gray-200'
-                                        }`}
-                                    >
-                                        <svg className="w-3.5 h-3.5 sm:w-3 sm:h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            ))}
-
-                            {/* 미분류 탭 */}
-                            <button
-                                onClick={() => handleFolderTabClick('unfiled')}
-                                className={`flex-shrink-0 px-4 py-2.5 sm:py-2 rounded-full text-sm font-medium transition-all duration-200 min-h-[44px] sm:min-h-0 snap-start ${
-                                    activeFolder === 'unfiled'
-                                        ? 'bg-gray-700 text-white shadow-md'
-                                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-                                }`}
-                            >
-                                미분류
+                                ) : (
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                )}
+                                <span className="max-w-[120px] truncate">
+                                    {activeChannel
+                                        ? channels.find(c => c.id === activeChannel)?.title || '채널'
+                                        : '전체 채널'
+                                    }
+                                </span>
+                                <svg className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${channelDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
                             </button>
 
-                            {/* 새 폴더 추가 버튼 (탭 형태) */}
+                            {/* 데스크탑: absolute dropdown / 모바일: fixed 바텀시트 */}
+                            {channelDropdownOpen && (
+                                <>
+                                    {/* 백드롭 */}
+                                    <div className="fixed inset-0 z-40" onClick={() => setChannelDropdownOpen(false)} />
+
+                                    {/* 데스크탑: 드롭다운 */}
+                                    <div className="hidden sm:block absolute left-0 top-full mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 max-h-96 overflow-y-auto">
+                                        {/* 전체 채널 */}
+                                        <button
+                                            onClick={() => {
+                                                setActiveChannel(null);
+                                                setChannelDropdownOpen(false);
+                                            }}
+                                            className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3 ${
+                                                !activeChannel ? 'bg-primary-50 text-primary-600 font-medium' : 'text-gray-700'
+                                            }`}
+                                        >
+                                            <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                                <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                                </svg>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-medium">전체 채널</div>
+                                                <div className="text-xs text-gray-400">{channels.length}개 채널의 영상 보기</div>
+                                            </div>
+                                        </button>
+
+                                        <div className="border-t border-gray-100"></div>
+
+                                        {channels.map(channel => (
+                                            <button
+                                                key={channel.id}
+                                                onClick={() => {
+                                                    setActiveChannel(channel.id);
+                                                    setChannelDropdownOpen(false);
+                                                }}
+                                                className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3 ${
+                                                    activeChannel === channel.id ? 'bg-emerald-50 text-emerald-700' : 'text-gray-700'
+                                                }`}
+                                            >
+                                                {channel.thumbnail ? (
+                                                    <img
+                                                        src={channel.thumbnail}
+                                                        alt=""
+                                                        className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                                                    />
+                                                ) : (
+                                                    <div className="w-9 h-9 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                                        <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                        </svg>
+                                                    </div>
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-medium truncate">{channel.title}</div>
+                                                    {channel.description && (
+                                                        <div className="text-xs text-gray-400 truncate">{channel.description}</div>
+                                                    )}
+                                                </div>
+                                                <span className="text-xs text-gray-400 flex-shrink-0">
+                                                    {channel.video_count || 0}개
+                                                </span>
+                                            </button>
+                                        ))}
+
+                                        {channels.length === 0 && (
+                                            <div className="px-4 py-8 text-center text-sm text-gray-400">
+                                                등록된 채널이 없습니다
+                                            </div>
+                                        )}
+
+                                        <div className="border-t border-gray-100 sticky bottom-0 bg-white">
+                                            <button
+                                                onClick={() => {
+                                                    setShowChannelUrlModal(true);
+                                                    setChannelDropdownOpen(false);
+                                                }}
+                                                className="w-full text-left px-4 py-3 text-sm text-primary-500 hover:bg-primary-50 transition-colors flex items-center gap-3"
+                                            >
+                                                <div className="w-9 h-9 bg-primary-50 rounded-full flex items-center justify-center flex-shrink-0">
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                    </svg>
+                                                </div>
+                                                <span className="font-medium">새 채널 추가</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* 모바일: 바텀시트 */}
+                                    <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl max-h-[60vh] overflow-hidden flex flex-col animate-slide-up">
+                                        {/* 드래그 핸들 */}
+                                        <div className="flex justify-center py-3 flex-shrink-0">
+                                            <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+                                        </div>
+                                        <div className="px-4 pb-2 flex-shrink-0">
+                                            <h3 className="text-base font-semibold text-gray-900">채널 선택</h3>
+                                            <p className="text-xs text-gray-400 mt-0.5">채널을 선택하면 해당 채널의 영상만 표시됩니다</p>
+                                        </div>
+
+                                        <div className="overflow-y-auto flex-1 pb-safe">
+                                            {/* 전체 채널 */}
+                                            <button
+                                                onClick={() => {
+                                                    setActiveChannel(null);
+                                                    setChannelDropdownOpen(false);
+                                                }}
+                                                className={`w-full text-left px-4 py-3.5 text-sm flex items-center gap-3 active:bg-gray-100 ${
+                                                    !activeChannel ? 'bg-primary-50 text-primary-600 font-medium' : 'text-gray-700'
+                                                }`}
+                                            >
+                                                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                                    <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                                    </svg>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-medium">전체 채널</div>
+                                                    <div className="text-xs text-gray-400">{channels.length}개 채널의 영상 보기</div>
+                                                </div>
+                                                {!activeChannel && (
+                                                    <svg className="w-5 h-5 text-primary-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                    </svg>
+                                                )}
+                                            </button>
+
+                                            <div className="border-t border-gray-100"></div>
+
+                                            {channels.map(channel => (
+                                                <button
+                                                    key={channel.id}
+                                                    onClick={() => {
+                                                        setActiveChannel(channel.id);
+                                                        setChannelDropdownOpen(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3.5 text-sm flex items-center gap-3 active:bg-gray-100 ${
+                                                        activeChannel === channel.id ? 'bg-emerald-50 text-emerald-700' : 'text-gray-700'
+                                                    }`}
+                                                >
+                                                    {channel.thumbnail ? (
+                                                        <img
+                                                            src={channel.thumbnail}
+                                                            alt=""
+                                                            className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                                            <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                            </svg>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="font-medium truncate">{channel.title}</div>
+                                                        {channel.description && (
+                                                            <div className="text-xs text-gray-400 line-clamp-1">{channel.description}</div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                                        <span className="text-xs text-gray-400">{channel.video_count || 0}개</span>
+                                                        {activeChannel === channel.id && (
+                                                            <svg className="w-5 h-5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+                                                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                            </svg>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            ))}
+
+                                            {channels.length === 0 && (
+                                                <div className="px-4 py-10 text-center text-sm text-gray-400">
+                                                    등록된 채널이 없습니다
+                                                </div>
+                                            )}
+
+                                            <div className="border-t border-gray-100">
+                                                <button
+                                                    onClick={() => {
+                                                        setShowChannelUrlModal(true);
+                                                        setChannelDropdownOpen(false);
+                                                    }}
+                                                    className="w-full text-left px-4 py-3.5 text-sm text-primary-500 flex items-center gap-3 active:bg-primary-50"
+                                                >
+                                                    <div className="w-10 h-10 bg-primary-50 rounded-full flex items-center justify-center flex-shrink-0">
+                                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                        </svg>
+                                                    </div>
+                                                    <span className="font-medium">새 채널 추가</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* 활성 채널 필터 칩 (해제 가능) */}
+                        {activeChannel && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-medium">
+                                {channels.find(c => c.id === activeChannel)?.title}
+                                <button onClick={() => setActiveChannel(null)} className="hover:text-emerald-800 ml-0.5">
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </span>
+                        )}
+
+                        {/* 활성 폴더 필터 칩 */}
+                        {activeFolder !== null && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-600 rounded-full text-xs font-medium">
+                                {activeFolder === 'unfiled' ? '미분류' : folders.find(f => f.id === activeFolder)?.name}
+                                <button onClick={() => setActiveFolder(null)} className="hover:text-primary-800 ml-0.5">
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </span>
+                        )}
+
+                        {/* 구분선 (필터 활성시) */}
+                        {(activeFolder !== null || activeChannel !== null) && (
+                            <button
+                                onClick={() => { setActiveFolder(null); setActiveChannel(null); }}
+                                className="text-xs text-gray-400 hover:text-gray-600 ml-1"
+                            >
+                                초기화
+                            </button>
+                        )}
+
+                        {/* 정렬 드롭다운 - 우측 끝 */}
+                        <div className="ml-auto">
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                            >
+                                <option value="newest">최신순</option>
+                                <option value="oldest">오래된순</option>
+                                <option value="title">제목순</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 영상 섹션 */}
+                <section>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                            <span>
+                                {activeChannel
+                                    ? channels.find(c => c.id === activeChannel)?.title
+                                    : showUnassignedOnly ? '미분류 영상' : '저장한 영상'}
+                            </span>
+                            <span className="text-xs sm:text-sm font-normal text-gray-500">
+                                {videos.length}개
+                            </span>
+                        </h2>
+                        {/* 데스크탑: 추가 버튼 */}
+                        <div className="hidden sm:flex items-center gap-2">
                             <button
                                 onClick={() => {
                                     setEditingFolder(null);
                                     setShowFolderModal(true);
                                 }}
-                                className="flex-shrink-0 p-2.5 sm:p-2 rounded-full text-gray-400 hover:text-primary-500 hover:bg-primary-50 transition-colors min-h-[44px] sm:min-h-0 snap-start"
-                                title="새 폴더"
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
                             >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
                                 </svg>
+                                폴더
                             </button>
-                        </div>
-                    </div>
-
-                    {/* 채널 그리드 */}
-                    <div
-                        ref={channelScrollRef}
-                        className="flex gap-3 overflow-x-auto pb-2 horizontal-scroll scroll-smooth"
-                    >
-                        {channels.map(channel => (
-                            <ChannelCard
-                                key={channel.id}
-                                channel={channel}
-                                onClick={handleChannelClick}
-                                isSelected={selectedChannels.has(channel.id)}
-                                onSelect={handleChannelSelect}
-                                selectionMode={selectionMode}
-                                onVideoDrop={handleVideoDrop}
-                                draggable={activeFolder === null}
-                                onUpdateThumbnail={handleUpdateThumbnail}
-                            />
-                        ))}
-
-                        {/* 채널 추가 카드 */}
-                        <AddChannelCard onClick={() => setShowChannelUrlModal(true)} />
-                    </div>
-
-                    {/* 현재 폴더 표시 */}
-                    {activeFolder !== null && (
-                        <div className="mt-3 flex items-center gap-2 text-sm text-gray-500">
-                            <span>
-                                {activeFolder === 'unfiled' ? '미분류' : folders.find(f => f.id === activeFolder)?.name}
-                                {' '}폴더의 채널 ({channels.length}개)
-                            </span>
                             <button
-                                onClick={() => setActiveFolder(null)}
-                                className="text-primary-500 hover:underline"
+                                onClick={() => setShowChannelUrlModal(true)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors"
                             >
-                                전체 보기
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                </svg>
+                                채널
                             </button>
-                        </div>
-                    )}
-                </section>
-
-                {/* 저장한 영상 섹션 */}
-                <section>
-                    {/* 섹션 헤더 - 개선됨 */}
-                    <div className="flex flex-col gap-3 mb-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                                    <span>{showUnassignedOnly ? '미분류 영상' : '저장한 영상'}</span>
-                                    <span className="text-xs sm:text-sm font-normal text-gray-500">
-                                        {videos.length}개
-                                    </span>
-                                </h2>
-                                {/* 정렬 */}
-                                <select
-                                    value={sortBy}
-                                    onChange={(e) => setSortBy(e.target.value)}
-                                    className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                >
-                                    <option value="newest">최신순</option>
-                                    <option value="oldest">오래된순</option>
-                                    <option value="title">제목순</option>
-                                </select>
-                            </div>
-
                         </div>
                     </div>
 
