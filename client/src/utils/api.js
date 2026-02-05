@@ -981,6 +981,9 @@ const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || '';
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 async function callGemini(prompt, maxTokens = 500) {
+    if (!GEMINI_API_KEY) {
+        throw new Error('API 키가 설정되지 않았습니다. 환경변수 VITE_GOOGLE_API_KEY를 설정해주세요.');
+    }
     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1008,11 +1011,16 @@ export const aiAssistApi = {
                 body: JSON.stringify({ action: 'refine-memo', title, description, memo })
             });
             if (response.ok) return response.json();
+            // Server returned error - try to get error message
+            const errorData = await response.json().catch(() => ({}));
+            if (errorData.error) {
+                console.log('서버 API 오류:', errorData.error);
+            }
         } catch (e) {
             console.log('서버 API 실패, 클라이언트 폴백:', e.message);
         }
 
-        // Direct Gemini call
+        // Direct Gemini call (only if API key is available)
         const prompt = `당신은 한국어 메모를 정리하는 전문가입니다.
 사용자가 작성한 영상에 대한 메모를 받아서, 의미는 그대로 유지하면서 더 읽기 쉽고 정돈된 형태로 다듬어주세요.
 
@@ -1044,11 +1052,16 @@ ${memo}
                 body: JSON.stringify({ action: 'suggest-tags', title, description, memo, existingTags })
             });
             if (response.ok) return response.json();
+            // Server returned error - try to get error message
+            const errorData = await response.json().catch(() => ({}));
+            if (errorData.error) {
+                console.log('서버 API 오류:', errorData.error);
+            }
         } catch (e) {
             console.log('서버 API 실패, 클라이언트 폴백:', e.message);
         }
 
-        // Direct Gemini call
+        // Direct Gemini call (only if API key is available)
         const existingTagsList = existingTags?.length > 0 ? `\n이미 입력된 태그: ${existingTags.join(', ')}` : '';
         const prompt = `영상 콘텐츠 분류 전문가로서, 다음 영상 정보를 분석하여 관련성 높은 한국어 태그를 5-7개 제안해주세요.
 
@@ -1093,7 +1106,11 @@ export const youtubeCommentsApi = {
             console.log('서버 API 실패, 클라이언트 폴백:', e.message);
         }
 
-        // Direct YouTube API call
+        // Direct YouTube API call (only if API key is available)
+        if (!YOUTUBE_API_KEY) {
+            console.log('YouTube API 키가 설정되지 않았습니다.');
+            return { comments: [], disabled: false };
+        }
         try {
             const ytResponse = await fetch(
                 `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&order=relevance&maxResults=10&key=${YOUTUBE_API_KEY}`
