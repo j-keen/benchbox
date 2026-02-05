@@ -12,6 +12,7 @@ import QuickUrlModal from '../components/QuickUrlModal';
 import MobileAddModal from '../components/MobileAddModal';
 import TagManagerModal from '../components/TagManagerModal';
 import FABMenu from '../components/FABMenu';
+import ApiKeySettingsModal from '../components/ApiKeySettingsModal';
 import { VideoGridSkeleton } from '../components/Skeleton';
 
 const Home = () => {
@@ -46,6 +47,9 @@ const Home = () => {
 
     // 태그 관리 모달
     const [showTagManager, setShowTagManager] = useState(false);
+
+    // API 키 설정 모달
+    const [showApiSettings, setShowApiSettings] = useState(false);
 
     // 모바일 추가 모달
     const [showMobileAddModal, setShowMobileAddModal] = useState(false);
@@ -1537,7 +1541,8 @@ const Home = () => {
                         setSelectionMode(true);
                     }
                 }}
-                hidden={!!selectedVideo || showFolderModal || showBatchTagModal || showChannelUrlModal || showVideoUrlModal || showTagManager || showMobileAddModal}
+                onOpenSettings={() => setShowApiSettings(true)}
+                hidden={!!selectedVideo || showFolderModal || showBatchTagModal || showChannelUrlModal || showVideoUrlModal || showTagManager || showMobileAddModal || showApiSettings}
             />
 
             {/* 영상 상세 모달 */}
@@ -1595,6 +1600,12 @@ const Home = () => {
             <TagManagerModal
                 isOpen={showTagManager}
                 onClose={() => setShowTagManager(false)}
+            />
+
+            {/* API 키 설정 모달 */}
+            <ApiKeySettingsModal
+                isOpen={showApiSettings}
+                onClose={() => setShowApiSettings(false)}
             />
 
             {/* 모바일 추가 모달 */}

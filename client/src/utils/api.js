@@ -976,12 +976,22 @@ export const parseUrlApi = {
 };
 
 // AI 어시스트 API
-// Google API Key - 환경변수에서 로드 (절대 하드코딩 금지!)
-const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || '';
+// Google API Key - localStorage 또는 환경변수에서 로드 (절대 하드코딩 금지!)
+const STORAGE_KEY = 'benchbox_google_api_key';
+
+function getGoogleApiKey() {
+    // localStorage 우선, 없으면 환경변수
+    return localStorage.getItem(STORAGE_KEY) || import.meta.env.VITE_GOOGLE_API_KEY || '';
+}
+
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 async function callGemini(prompt, maxTokens = 500) {
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const apiKey = getGoogleApiKey();
+    if (!apiKey) {
+        throw new Error('API 키가 설정되지 않았습니다. 설정에서 Google API 키를 등록해주세요.');
+    }
+    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1008,11 +1018,16 @@ export const aiAssistApi = {
                 body: JSON.stringify({ action: 'refine-memo', title, description, memo })
             });
             if (response.ok) return response.json();
+            // Server returned error - try to get error message
+            const errorData = await response.json().catch(() => ({}));
+            if (errorData.error) {
+                console.log('서버 API 오류:', errorData.error);
+            }
         } catch (e) {
             console.log('서버 API 실패, 클라이언트 폴백:', e.message);
         }
 
-        // Direct Gemini call
+        // Direct Gemini call (only if API key is available)
         const prompt = `당신은 한국어 메모를 정리하는 전문가입니다.
 사용자가 작성한 영상에 대한 메모를 받아서, 의미는 그대로 유지하면서 더 읽기 쉽고 정돈된 형태로 다듬어주세요.
 
@@ -1044,11 +1059,16 @@ ${memo}
                 body: JSON.stringify({ action: 'suggest-tags', title, description, memo, existingTags })
             });
             if (response.ok) return response.json();
+            // Server returned error - try to get error message
+            const errorData = await response.json().catch(() => ({}));
+            if (errorData.error) {
+                console.log('서버 API 오류:', errorData.error);
+            }
         } catch (e) {
             console.log('서버 API 실패, 클라이언트 폴백:', e.message);
         }
 
-        // Direct Gemini call
+        // Direct Gemini call (only if API key is available)
         const existingTagsList = existingTags?.length > 0 ? `\n이미 입력된 태그: ${existingTags.join(', ')}` : '';
         const prompt = `영상 콘텐츠 분류 전문가로서, 다음 영상 정보를 분석하여 관련성 높은 한국어 태그를 5-7개 제안해주세요.
 
@@ -1071,9 +1091,7 @@ ${memo}
     }
 };
 
-// YouTube 댓글 API
-const YOUTUBE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || '';
-
+// YouTube 댓글 API (같은 Google API Key 사용)
 export const youtubeCommentsApi = {
     getComments: async (videoUrl) => {
         const match = videoUrl?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]+)/);
@@ -1093,10 +1111,15 @@ export const youtubeCommentsApi = {
             console.log('서버 API 실패, 클라이언트 폴백:', e.message);
         }
 
-        // Direct YouTube API call
+        // Direct YouTube API call (only if API key is available)
+        const youtubeApiKey = getGoogleApiKey();
+        if (!youtubeApiKey) {
+            console.log('YouTube API 키가 설정되지 않았습니다.');
+            return { comments: [], disabled: false };
+        }
         try {
             const ytResponse = await fetch(
-                `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&order=relevance&maxResults=10&key=${YOUTUBE_API_KEY}`
+                `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&order=relevance&maxResults=10&key=${youtubeApiKey}`
             );
             if (ytResponse.status === 403) return { comments: [], disabled: true };
             if (!ytResponse.ok) throw new Error('YouTube API 호출 실패');

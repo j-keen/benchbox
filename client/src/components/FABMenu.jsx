@@ -9,6 +9,7 @@ import {
     CheckCircleIcon,
     ChevronDownIcon,
     LinkIcon,
+    KeyIcon,
 } from '@heroicons/react/24/outline';
 
 /**
@@ -27,6 +28,7 @@ export default function FABMenu({
     onAddFolder,
     onOpenTagManager,
     onToggleSelectionMode,
+    onOpenSettings,
     hidden = false,
 }) {
     const [isOpen, setIsOpen] = useState(false);
@@ -119,6 +121,14 @@ export default function FABMenu({
             textColor: 'text-gray-600',
             action: onToggleSelectionMode,
             delay: '200ms',
+        },
+        {
+            icon: KeyIcon,
+            label: 'API 키 설정',
+            bgColor: 'bg-orange-100',
+            textColor: 'text-orange-600',
+            action: onOpenSettings,
+            delay: '250ms',
         },
     ];
 
