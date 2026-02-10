@@ -3,17 +3,10 @@
   "version": "1.0.0",
   "description": "콘텐츠 크리에이터를 위한 벤치마킹 자료 관리 웹앱",
   "scripts": {
-    "install:all": "npm install && cd client && npm install && cd ../server && npm install",
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:client": "cd client && npm run dev",
-    "dev:server": "cd server && npm run dev",
-    "build": "cd client && npm install && npm run build",
-    "start": "cd server && npm start"
+    "dev": "cd client && npm run dev",
+    "build": "cd client && npm install && npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0"
-  },
-  "devDependencies": {
-    "concurrently": "^8.2.2"
   }
 }
