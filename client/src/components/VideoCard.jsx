@@ -207,6 +207,46 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
                 <div className="mt-1 text-xs text-gray-400">
                     {formatDate(video.created_at)}
                 </div>
+
+                {/* 검색 매칭 스니펫 (메모/태그) */}
+                {searchQuery && (() => {
+                    const cleanQuery = searchQuery.replace(/^#/, '').toLowerCase();
+                    if (!cleanQuery) return null;
+
+                    const memoMatches = video.memo?.toLowerCase().includes(cleanQuery);
+                    const matchingTags = video.tags?.filter(t => t.toLowerCase().includes(cleanQuery)) || [];
+
+                    if (!memoMatches && matchingTags.length === 0) return null;
+
+                    return (
+                        <div className="mt-1.5 pt-1.5 border-t border-gray-100 space-y-1">
+                            {memoMatches && video.memo && (() => {
+                                const idx = video.memo.toLowerCase().indexOf(cleanQuery);
+                                const start = Math.max(0, idx - 15);
+                                const end = Math.min(video.memo.length, idx + cleanQuery.length + 15);
+                                const snippet =
+                                    (start > 0 ? '...' : '') +
+                                    video.memo.slice(start, end) +
+                                    (end < video.memo.length ? '...' : '');
+                                return (
+                                    <p className="text-[11px] text-gray-400 line-clamp-1">
+                                        📝 <HighlightText text={snippet} query={searchQuery} />
+                                    </p>
+                                );
+                            })()}
+
+                            {matchingTags.length > 0 && (
+                                <div className="flex flex-wrap gap-0.5">
+                                    {matchingTags.slice(0, 3).map(tag => (
+                                        <span key={tag} className="text-[10px] bg-gray-100 text-gray-500 px-1 py-0.5 rounded">
+                                            <HighlightText text={`#${tag}`} query={searchQuery} />
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
             </div>
         </div>
     );
