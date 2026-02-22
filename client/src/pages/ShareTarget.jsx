@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { parseUrlApi, videosApi, channelsApi } from '../utils/api';
 import { useToast } from '../contexts/ToastContext';
 import MobileAddModal from '../components/MobileAddModal';
@@ -24,7 +24,6 @@ function extractUrl(params) {
 
 export default function ShareTarget() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { addToast } = useToast();
 
   const [loading, setLoading] = useState(true);
@@ -80,7 +79,7 @@ export default function ShareTarget() {
         await videosApi.create(data);
         addToast('영상이 저장되었습니다!', 'success');
       }
-      navigate('/');
+      window.location.replace('/');
     } catch (err) {
       if (err.response?.status === 409) {
         addToast(err.response.data.error, 'error');
@@ -92,7 +91,7 @@ export default function ShareTarget() {
   };
 
   const handleClose = () => {
-    navigate('/');
+    window.location.replace('/');
   };
 
   // 로딩 중
