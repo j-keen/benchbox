@@ -314,7 +314,7 @@ const AllVideosPage = () => {
 
                         {/* 영상 카드들 */}
                         {videos.map(video => (
-                            <div key={video.id}
+                            <div key={video.id}>
                                 <VideoCard
                                     video={video}
                                     onClick={setSelectedVideo}
