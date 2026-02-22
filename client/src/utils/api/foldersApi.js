@@ -6,25 +6,20 @@ export const foldersApi = {
     getAll: async () => {
         const { data: folders, error } = await withRetry(() => supabase
             .from('folders')
-            .select('*')
+            .select('*, channels(count), videos(count)')
             .order('sort_order', { ascending: true })
             .order('created_at', { ascending: false }));
 
         if (error) throw error;
 
-        const foldersWithCount = await Promise.all(folders.map(async (folder) => {
-            const { count: channelCount } = await withRetry(() => supabase
-                .from('channels')
-                .select('*', { count: 'exact', head: true })
-                .eq('folder_id', folder.id));
-
-            const { count: videoCount } = await withRetry(() => supabase
-                .from('videos')
-                .select('*', { count: 'exact', head: true })
-                .eq('folder_id', folder.id));
-
-            return { ...folder, channel_count: channelCount || 0, video_count: videoCount || 0 };
-        }));
+        const foldersWithCount = folders.map(folder => {
+            const { channels, videos, ...folderData } = folder;
+            return {
+                ...folderData,
+                channel_count: channels?.[0]?.count || 0,
+                video_count: videos?.[0]?.count || 0
+            };
+        });
 
         return { data: { folders: foldersWithCount } };
     },
@@ -33,72 +28,65 @@ export const foldersApi = {
         const { data: folder, error } = await withRetry(() => supabase.from('folders').select('*').eq('id', id).single());
         if (error) throw error;
 
-        const { data: channels } = await withRetry(() => supabase
+        const { data: channelsRaw } = await withRetry(() => supabase
             .from('channels')
-            .select('*')
+            .select('*, videos(count)')
             .eq('folder_id', id)
             .order('created_at', { ascending: false }));
 
-        const channelsWithCount = await Promise.all((channels || []).map(async (channel) => {
-            const { count } = await withRetry(() => supabase
-                .from('videos')
-                .select('*', { count: 'exact', head: true })
-                .eq('channel_id', channel.id));
-            return { ...channel, video_count: count || 0 };
-        }));
+        const channelsWithCount = (channelsRaw || []).map(channel => {
+            const { videos, ...channelData } = channel;
+            return { ...channelData, video_count: videos?.[0]?.count || 0 };
+        });
 
-        const channelIds = (channels || []).map(c => c.id);
+        const channelIds = channelsWithCount.map(c => c.id);
         let channelVideos = [];
         if (channelIds.length > 0) {
             const { data } = await withRetry(() => supabase
                 .from('videos')
-                .select('*, channels(title, thumbnail)')
+                .select('*, channels(title, thumbnail), video_tags(tags(name))')
                 .in('channel_id', channelIds)
                 .order('created_at', { ascending: false }));
 
-            channelVideos = (data || []).map(v => ({
-                ...v,
-                channel_title: v.channels?.title,
-                channel_thumbnail: v.channels?.thumbnail,
-                source_type: 'channel'
-            }));
+            channelVideos = (data || []).map(v => {
+                const tags = (v.video_tags || []).map(vt => vt.tags?.name).filter(Boolean);
+                const { video_tags: _, channels: __, ...videoData } = v;
+                return {
+                    ...videoData,
+                    tags,
+                    channel_title: v.channels?.title,
+                    channel_thumbnail: v.channels?.thumbnail,
+                    source_type: 'channel'
+                };
+            });
         }
 
         const { data: folderVideos } = await withRetry(() => supabase
             .from('videos')
-            .select('*')
+            .select('*, video_tags(tags(name))')
             .eq('folder_id', id)
             .is('channel_id', null)
             .order('created_at', { ascending: false }));
 
-        const directVideos = (folderVideos || []).map(v => ({
-            ...v,
-            channel_title: null,
-            channel_thumbnail: null,
-            source_type: 'folder'
-        }));
+        const directVideos = (folderVideos || []).map(v => {
+            const tags = (v.video_tags || []).map(vt => vt.tags?.name).filter(Boolean);
+            const { video_tags: _, ...videoData } = v;
+            return {
+                ...videoData,
+                tags,
+                channel_title: null,
+                channel_thumbnail: null,
+                source_type: 'folder'
+            };
+        });
 
-        const allVideos = [...channelVideos, ...directVideos].sort(
+        const videosWithTags = [...channelVideos, ...directVideos].sort(
             (a, b) => new Date(b.created_at) - new Date(a.created_at)
         );
 
-        const videosWithTags = await Promise.all(allVideos.map(async (video) => {
-            const { data: tagData } = await withRetry(() => supabase
-                .from('video_tags')
-                .select('tags(name)')
-                .eq('video_id', video.id));
-            const tags = tagData?.map(t => t.tags?.name).filter(Boolean) || [];
-            return { ...video, tags };
-        }));
-
-        const { count: channelCount } = await withRetry(() => supabase
-            .from('channels')
-            .select('*', { count: 'exact', head: true })
-            .eq('folder_id', id));
-
         return {
             data: {
-                folder: { ...folder, channel_count: channelCount || 0 },
+                folder: { ...folder, channel_count: channelsWithCount.length },
                 channels: channelsWithCount,
                 videos: videosWithTags,
                 stats: {

@@ -6,7 +6,7 @@ import { storageApi } from './storageApi';
 // 채널 API
 export const channelsApi = {
     getAll: async (params = {}) => {
-        let query = supabase.from('channels').select('*, folders(name, color)');
+        let query = supabase.from('channels').select('*, folders(name, color), videos(count)');
 
         if (params.folder_id !== undefined) {
             if (params.folder_id === 'null' || params.folder_id === '') {
@@ -20,19 +20,15 @@ export const channelsApi = {
         const { data: channels, error } = await withRetry(() => query);
         if (error) throw error;
 
-        const channelsWithCount = await Promise.all(channels.map(async (channel) => {
-            const { count } = await withRetry(() => supabase
-                .from('videos')
-                .select('*', { count: 'exact', head: true })
-                .eq('channel_id', channel.id));
-
+        const channelsWithCount = channels.map(channel => {
+            const { videos, ...channelData } = channel;
             return {
-                ...channel,
-                video_count: count || 0,
+                ...channelData,
+                video_count: videos?.[0]?.count || 0,
                 folder_name: channel.folders?.name,
                 folder_color: channel.folders?.color
             };
-        }));
+        });
 
         return { data: { channels: channelsWithCount } };
     },

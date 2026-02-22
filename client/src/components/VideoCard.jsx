@@ -1,7 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { getPlatformIcon, getPlatformColor } from '../utils/platformIcons';
+import HighlightText from './HighlightText';
 
-const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, draggable = true }) => {
+const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, draggable = true, searchQuery }) => {
     const [isHovered, setIsHovered] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const PlatformIcon = getPlatformIcon(video.platform);
@@ -190,7 +191,9 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
             {/* 정보 */}
             <div className="p-2 sm:p-3">
                 <h3 className="font-medium text-gray-900 line-clamp-2 text-sm leading-5">
-                    {video.title || 'Untitled'}
+                    {video.title
+                        ? <HighlightText text={video.title} query={searchQuery} />
+                        : 'Untitled'}
                 </h3>
 
                 {/* 채널명 - 항상 표시 */}

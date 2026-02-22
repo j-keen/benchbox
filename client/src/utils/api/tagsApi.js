@@ -7,26 +7,17 @@ export const tagsApi = {
     getAll: async () => {
         const { data: tags, error } = await withRetry(() => supabase
             .from('tags')
-            .select('*, tag_categories(id, name, color)'));
+            .select('*, tag_categories(id, name, color), video_tags(count), channel_tags(count)'));
         if (error) throw error;
 
-        const tagsWithCount = await Promise.all(tags.map(async (tag) => {
-            const { count: videoCount } = await withRetry(() => supabase
-                .from('video_tags')
-                .select('*', { count: 'exact', head: true })
-                .eq('tag_id', tag.id));
-
-            const { count: channelCount } = await withRetry(() => supabase
-                .from('channel_tags')
-                .select('*', { count: 'exact', head: true })
-                .eq('tag_id', tag.id));
-
+        const tagsWithCount = tags.map(tag => {
+            const { video_tags, channel_tags, ...tagData } = tag;
             return {
-                ...tag,
-                count: (videoCount || 0) + (channelCount || 0),
+                ...tagData,
+                count: (video_tags?.[0]?.count || 0) + (channel_tags?.[0]?.count || 0),
                 category: tag.tag_categories || null
             };
-        }));
+        });
 
         tagsWithCount.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
         return { data: { tags: tagsWithCount } };
@@ -40,20 +31,16 @@ export const tagsApi = {
             .select('*')
             .order('sort_order', { ascending: true }));
 
-        // 모든 태그 가져오기
+        // 모든 태그 가져오기 (사용 횟수 포함)
         const { data: tags } = await withRetry(() => supabase
             .from('tags')
-            .select('*')
+            .select('*, video_tags(count)')
             .order('name', { ascending: true }));
 
-        // 태그별 사용 횟수
-        const tagsWithCount = await Promise.all((tags || []).map(async (tag) => {
-            const { count: videoCount } = await withRetry(() => supabase
-                .from('video_tags')
-                .select('*', { count: 'exact', head: true })
-                .eq('tag_id', tag.id));
-            return { ...tag, count: videoCount || 0 };
-        }));
+        const tagsWithCount = (tags || []).map(tag => {
+            const { video_tags, ...tagData } = tag;
+            return { ...tagData, count: video_tags?.[0]?.count || 0 };
+        });
 
         // 카테고리별로 그룹화
         const result = (categories || []).map(cat => ({

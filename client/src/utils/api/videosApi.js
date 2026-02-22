@@ -6,7 +6,7 @@ import { syncVideoTags } from './tagHelpers';
 // 영상 API
 export const videosApi = {
     getAll: async (params = {}) => {
-        let query = supabase.from('videos').select('*');
+        let query = supabase.from('videos').select('*, video_tags(tags(name))');
 
         if (params.channel_id === 'null' || params.channel_id === '') {
             query = query.is('channel_id', null);
@@ -49,17 +49,15 @@ export const videosApi = {
         const { data: videos, error } = await withRetry(() => query);
         if (error) throw error;
 
-        // 태그 가져오기
-        const videosWithTags = await Promise.all(videos.map(async (video) => {
-            const { data: tagData } = await withRetry(() => supabase
-                .from('video_tags')
-                .select('tags(name)')
-                .eq('video_id', video.id));
-            const tags = tagData?.map(t => t.tags?.name).filter(Boolean) || [];
-
+        // 관계형 쿼리로 가져온 태그 데이터를 파싱
+        const videosWithTags = videos.map(video => {
+            const tags = (video.video_tags || []).map(vt => vt.tags?.name).filter(Boolean);
+            const { video_tags: _, ...videoData } = video;
+            return { ...videoData, tags };
+        }).filter(video => {
             // 태그 필터
-            if (params.tag && !tags.includes(params.tag)) {
-                return null;
+            if (params.tag && !video.tags.includes(params.tag)) {
+                return false;
             }
 
             // 검색어로 태그도 검색 (# 제거 후 비교)
@@ -67,17 +65,17 @@ export const videosApi = {
                 const searchLower = params.search.replace(/^#/, '').toLowerCase();
                 const titleMatch = video.title?.toLowerCase().includes(searchLower);
                 const memoMatch = video.memo?.toLowerCase().includes(searchLower);
-                const tagMatch = tags.some(tag => tag.toLowerCase().includes(searchLower));
+                const tagMatch = video.tags.some(tag => tag.toLowerCase().includes(searchLower));
 
                 if (!titleMatch && !memoMatch && !tagMatch) {
-                    return null;
+                    return false;
                 }
             }
 
-            return { ...video, tags };
-        }));
+            return true;
+        });
 
-        return { data: { videos: videosWithTags.filter(v => v !== null) } };
+        return { data: { videos: videosWithTags } };
     },
 
     getById: async (id) => {

@@ -18,6 +18,8 @@ import { VideoGridSkeleton } from '../components/Skeleton';
 const Home = () => {
     const navigate = useNavigate();
     const searchInputRef = useRef(null);
+    const foldersCache = useRef(null);
+    const tagsCache = useRef(null);
     const toast = useToast();
 
     // 상태
@@ -25,7 +27,7 @@ const Home = () => {
     const [channels, setChannels] = useState([]);
     const [folders, setFolders] = useState([]);
     const [allTags, setAllTags] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [videosLoading, setVideosLoading] = useState(true);
     const [selectedVideo, setSelectedVideo] = useState(null);
 
     // 폴더 상태
@@ -78,10 +80,17 @@ const Home = () => {
         return false;
     };
 
+    // 검색 디바운싱: 타이핑 중에는 쿼리를 보내지 않고, 300ms 멈추면 실행
+    const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
     // 데이터 로드
     useEffect(() => {
         loadData();
-    }, [sortBy, searchQuery, activeFolder, activeChannel, showUnassignedOnly]);
+    }, [sortBy, debouncedSearch, activeFolder, activeChannel, showUnassignedOnly]);
 
     // 선택 모드 토글
     useEffect(() => {
@@ -92,9 +101,22 @@ const Home = () => {
         }
     }, [selectedChannels, selectedVideos, selectedFolders]);
 
-    const loadData = async () => {
+    const loadData = async (forceRefreshCache = false) => {
         try {
-            setLoading(true);
+            setVideosLoading(true);
+
+            // 캐시 무효화 요청이면 캐시 초기화
+            if (forceRefreshCache) {
+                foldersCache.current = null;
+                tagsCache.current = null;
+            }
+
+            // 캐시된 폴더/태그가 있으면 먼저 즉시 반영 (사이드바 깜빡임 방지)
+            if (foldersCache.current) setFolders(foldersCache.current);
+            if (tagsCache.current) setAllTags(tagsCache.current);
+
+            // 캐시가 없을 때만 폴더/태그 API 호출
+            const needCacheLoad = !foldersCache.current || !tagsCache.current;
 
             // 폴더 필터 파라미터
             const channelParams = {};
@@ -106,12 +128,21 @@ const Home = () => {
 
             // 특정 폴더 선택 시 해당 폴더의 영상만 가져오기
             if (activeFolder !== null && activeFolder !== 'unfiled') {
-                // 폴더 상세 API 사용 (채널 영상 + 직접 저장 영상 모두 포함)
-                const [folderRes, foldersRes, tagsRes] = await Promise.all([
-                    foldersApi.getById(activeFolder),
-                    foldersApi.getAll(),
-                    tagsApi.getAll()
-                ]);
+                // 폴더 상세 API + 필요시 폴더/태그 목록
+                const promises = [foldersApi.getById(activeFolder)];
+                if (needCacheLoad) {
+                    promises.push(foldersApi.getAll(), tagsApi.getAll());
+                }
+
+                const results = await Promise.all(promises);
+                const folderRes = results[0];
+
+                if (needCacheLoad) {
+                    foldersCache.current = results[1].data.folders || [];
+                    tagsCache.current = results[2].data.tags || [];
+                    setFolders(foldersCache.current);
+                    setAllTags(tagsCache.current);
+                }
 
                 // 폴더의 영상들 필터링 적용
                 let folderVideos = folderRes.data.videos || [];
@@ -121,9 +152,9 @@ const Home = () => {
                     folderVideos = folderVideos.filter(v => v.channel_id === activeChannel);
                 }
 
-                // 검색 필터
-                if (searchQuery) {
-                    const query = searchQuery.toLowerCase();
+                // 검색 필터 (# 제거 후 비교)
+                if (debouncedSearch) {
+                    const query = debouncedSearch.replace(/^#/, '').toLowerCase();
                     folderVideos = folderVideos.filter(v =>
                         v.title?.toLowerCase().includes(query) ||
                         v.memo?.toLowerCase().includes(query) ||
@@ -141,13 +172,11 @@ const Home = () => {
 
                 setVideos(folderVideos);
                 setChannels(folderRes.data.channels || []);
-                setFolders(foldersRes.data.folders || []);
-                setAllTags(tagsRes.data.tags || []);
             } else {
                 // 전체 또는 미분류: 기존 로직
                 const videoParams = {
                     sort: sortBy,
-                    search: searchQuery || undefined
+                    search: debouncedSearch || undefined
                 };
 
                 // 채널 필터
@@ -163,22 +192,31 @@ const Home = () => {
                     videoParams.unassigned = true;
                 }
 
-                const [videosRes, channelsRes, foldersRes, tagsRes] = await Promise.all([
+                // 영상+채널은 항상 조회, 폴더/태그는 캐시 없을 때만
+                const promises = [
                     videosApi.getAll(videoParams),
-                    channelsApi.getAll(channelParams),
-                    foldersApi.getAll(),
-                    tagsApi.getAll()
-                ]);
+                    channelsApi.getAll(channelParams)
+                ];
+                if (needCacheLoad) {
+                    promises.push(foldersApi.getAll(), tagsApi.getAll());
+                }
 
-                setVideos(videosRes.data.videos || []);
-                setChannels(channelsRes.data.channels || []);
-                setFolders(foldersRes.data.folders || []);
-                setAllTags(tagsRes.data.tags || []);
+                const results = await Promise.all(promises);
+
+                setVideos(results[0].data.videos || []);
+                setChannels(results[1].data.channels || []);
+
+                if (needCacheLoad) {
+                    foldersCache.current = results[2].data.folders || [];
+                    tagsCache.current = results[3].data.tags || [];
+                    setFolders(foldersCache.current);
+                    setAllTags(tagsCache.current);
+                }
             }
         } catch (error) {
             console.error('데이터 로드 오류:', error);
         } finally {
-            setLoading(false);
+            setVideosLoading(false);
         }
     };
 
@@ -314,7 +352,7 @@ const Home = () => {
     const handleChannelDropToFolder = async (channel, folder) => {
         try {
             await foldersApi.moveChannels(folder.id, [channel.id]);
-            await loadData();
+            await loadData(true);
             toast.success(`${folder.name} 폴더로 이동했습니다.`);
         } catch (error) {
             console.error('채널 이동 오류:', error);
@@ -545,7 +583,7 @@ const Home = () => {
 
         try {
             await foldersApi.moveChannels(folderId, Array.from(selectedChannels));
-            await loadData();
+            await loadData(true);
             clearSelection();
             toast.success('채널을 폴더로 이동했습니다.');
         } catch (error) {
@@ -603,7 +641,7 @@ const Home = () => {
                     await videosApi.update(videoId, { tags: newTags });
                 }
             }
-            await loadData();
+            await loadData(true);
             clearSelection();
             setShowBatchTagModal(false);
             toast.success('태그가 추가되었습니다.');
@@ -635,7 +673,7 @@ const Home = () => {
             } else {
                 await foldersApi.create(folderData);
             }
-            await loadData();
+            await loadData(true);
             setShowFolderModal(false);
             setEditingFolder(null);
             toast.success(editingFolder ? '폴더가 수정되었습니다.' : '폴더가 생성되었습니다.');
@@ -654,7 +692,7 @@ const Home = () => {
             if (activeFolder === folderId) {
                 setActiveFolder(null);
             }
-            await loadData();
+            await loadData(true);
             toast.success('폴더가 삭제되었습니다.');
         } catch (error) {
             console.error('폴더 삭제 오류:', error);
@@ -1401,7 +1439,7 @@ const Home = () => {
                                         : showUnassignedOnly ? '미분류 영상' : '저장한 영상'}
                                 </span>
                                 <span className="text-xs sm:text-sm font-normal text-gray-500">
-                                    {videos.length}개
+                                    {videosLoading ? '...' : `${videos.length}개`}
                                 </span>
                             </h2>
                             {/* 숏폼/롱폼 필터 */}
@@ -1471,7 +1509,7 @@ const Home = () => {
                             : durationFilter === 'short'
                                 ? videos.filter(v => isShortForm(v))
                                 : videos.filter(v => !isShortForm(v));
-                        return loading ? (
+                        return videosLoading ? (
                             <VideoGridSkeleton count={10} />
                         ) : filteredVideos.length > 0 ? (
                         <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-4">
@@ -1483,6 +1521,7 @@ const Home = () => {
                                         isSelected={selectedVideos.has(video.id)}
                                         onSelect={handleVideoSelect}
                                         selectionMode={selectionMode}
+                                        searchQuery={debouncedSearch}
                                     />
                                 </div>
                             ))}
@@ -1599,7 +1638,7 @@ const Home = () => {
             {/* 태그 관리 모달 */}
             <TagManagerModal
                 isOpen={showTagManager}
-                onClose={() => setShowTagManager(false)}
+                onClose={() => { setShowTagManager(false); loadData(true); }}
             />
 
             {/* API 키 설정 모달 */}
