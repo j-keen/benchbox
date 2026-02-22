@@ -575,9 +575,9 @@ const FolderDetail = () => {
 
                     {/* 영상 그리드 */}
                     {sortedVideos.length > 0 ? (
-                        <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-4 space-y-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                             {sortedVideos.map(video => (
-                                <div key={video.id} className="break-inside-avoid">
+                                <div key={video.id}
                                     <VideoCard
                                         video={video}
                                         onClick={setSelectedVideo}

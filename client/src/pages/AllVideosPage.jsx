@@ -298,9 +298,9 @@ const AllVideosPage = () => {
                         <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
                     </div>
                 ) : (
-                    <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-4 space-y-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                         {/* 영상 추가 카드 */}
-                        <div className="break-inside-avoid">
+                        <div>
                             <div
                                 onClick={() => setShowAddModal(true)}
                                 className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 cursor-pointer hover:border-primary-400 hover:bg-primary-50 transition-colors aspect-video flex flex-col items-center justify-center text-gray-400 hover:text-primary-500"
@@ -314,7 +314,7 @@ const AllVideosPage = () => {
 
                         {/* 영상 카드들 */}
                         {videos.map(video => (
-                            <div key={video.id} className="break-inside-avoid">
+                            <div key={video.id}
                                 <VideoCard
                                     video={video}
                                     onClick={setSelectedVideo}

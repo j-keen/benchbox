@@ -1474,9 +1474,9 @@ const Home = () => {
                         return loading ? (
                             <VideoGridSkeleton count={10} />
                         ) : filteredVideos.length > 0 ? (
-                        <div className="columns-3 md:columns-4 lg:columns-5 gap-2 sm:gap-4 space-y-2 sm:space-y-4">
+                        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-4">
                             {filteredVideos.map(video => (
-                                <div key={video.id} className="break-inside-avoid">
+                                <div key={video.id}
                                     <VideoCard
                                         video={video}
                                         onClick={setSelectedVideo}
