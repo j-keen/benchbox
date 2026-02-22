@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { tagsApi } from '../utils/api';
+import useModalHistory from '../hooks/useModalHistory';
 
 const BatchTagModal = ({ selectedCount, onApply, onClose }) => {
+    useModalHistory(true, onClose);
     const [tagInput, setTagInput] = useState('');
     const [tags, setTags] = useState([]);
     const [suggestions, setSuggestions] = useState([]);

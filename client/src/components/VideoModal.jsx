@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { videosApi, aiAssistApi, youtubeCommentsApi } from '../utils/api';
 import { getPlatformIcon, getPlatformColor, getPlatformName } from '../utils/platformIcons';
 import TagInput from './TagInput';
+import useModalHistory from '../hooks/useModalHistory';
 
 const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
+    useModalHistory(!!video, onClose);
     const [memo, setMemo] = useState(video?.memo || '');
     const [tags, setTags] = useState(video?.tags || []);
     const [saving, setSaving] = useState(false);

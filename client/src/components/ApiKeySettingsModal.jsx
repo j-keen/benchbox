@@ -7,6 +7,7 @@ import {
     EyeIcon,
     EyeSlashIcon,
 } from '@heroicons/react/24/outline';
+import useModalHistory from '../hooks/useModalHistory';
 
 const STORAGE_KEY = 'benchbox_google_api_key';
 
@@ -25,6 +26,7 @@ export function setStoredApiKey(key) {
 }
 
 export default function ApiKeySettingsModal({ isOpen, onClose }) {
+    useModalHistory(isOpen, onClose);
     const [apiKey, setApiKey] = useState('');
     const [showKey, setShowKey] = useState(false);
     const [testStatus, setTestStatus] = useState(null); // null, 'testing', 'success', 'error'

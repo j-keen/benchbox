@@ -2,8 +2,10 @@ import { useState } from 'react';
 import TagInput from './TagInput';
 import { getPlatformIcon, getPlatformColor, getPlatformName } from '../utils/platformIcons';
 import { aiAssistApi } from '../utils/api';
+import useModalHistory from '../hooks/useModalHistory';
 
 export default function MobileAddModal({ preview, channels, currentChannelId, onSave, onClose }) {
+  useModalHistory(true, onClose);
   const [memo, setMemo] = useState('');
   const [tags, setTags] = useState([]);
   const [selectedChannelId, setSelectedChannelId] = useState(currentChannelId || null);

@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import useModalHistory from '../hooks/useModalHistory';
 import {
     PlusIcon,
     VideoCameraIcon,
@@ -32,6 +33,7 @@ export default function FABMenu({
     hidden = false,
 }) {
     const [isOpen, setIsOpen] = useState(false);
+    useModalHistory(isOpen, () => setIsOpen(false));
     const [tipsExpanded, setTipsExpanded] = useState(false);
     const longPressTimer = useRef(null);
     const isLongPress = useRef(false);

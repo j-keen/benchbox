@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useToast } from '../contexts/ToastContext';
+import useModalHistory from '../hooks/useModalHistory';
 
 const QuickUrlModal = ({ title, placeholder, onSubmit, onClose }) => {
+    useModalHistory(true, onClose);
     const toast = useToast();
     const [url, setUrl] = useState('');
     const [loading, setLoading] = useState(false);

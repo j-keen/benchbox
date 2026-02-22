@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import useModalHistory from '../hooks/useModalHistory';
 
 const FOLDER_COLORS = [
     '#6366f1', // indigo
@@ -14,6 +15,7 @@ const FOLDER_COLORS = [
 ];
 
 const FolderModal = ({ folder, onSave, onClose }) => {
+    useModalHistory(true, onClose);
     const [name, setName] = useState(folder?.name || '');
     const [color, setColor] = useState(folder?.color || FOLDER_COLORS[0]);
     const [description, setDescription] = useState(folder?.description || '');

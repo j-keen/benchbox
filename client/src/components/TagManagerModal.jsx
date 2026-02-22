@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { tagsApi, tagCategoriesApi } from '../utils/api';
 import { useToast } from '../contexts/ToastContext';
+import useModalHistory from '../hooks/useModalHistory';
 
 const TagManagerModal = ({ isOpen, onClose }) => {
+    useModalHistory(isOpen, onClose);
     const { showToast } = useToast();
     const [categories, setCategories] = useState([]);
     const [tags, setTags] = useState([]);
