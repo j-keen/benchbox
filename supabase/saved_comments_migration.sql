@@ -3,7 +3,7 @@
 
 CREATE TABLE saved_comments (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+    video_id BIGINT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
     author VARCHAR(255) NOT NULL,
     text TEXT NOT NULL,
     like_count INTEGER DEFAULT 0,
