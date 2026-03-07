@@ -9,6 +9,7 @@ import AllChannelsPage from './pages/AllChannelsPage';
 import AllVideosPage from './pages/AllVideosPage';
 import BrowsePage from './pages/BrowsePage';
 import ShareTarget from './pages/ShareTarget';
+import SavedCommentsPage from './pages/SavedCommentsPage';
 
 function App() {
     return (
@@ -21,6 +22,7 @@ function App() {
                 <Route path="/videos" element={<AllVideosPage />} />
                 <Route path="/browse" element={<BrowsePage />} />
                 <Route path="/share" element={<ShareTarget />} />
+                <Route path="/saved-comments" element={<SavedCommentsPage />} />
             </Routes>
             <ToastContainer />
         </ToastProvider>

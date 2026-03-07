@@ -10,3 +10,4 @@ export { tagsApi } from './tagsApi';
 export { parseUrlApi } from './parseUrlApi';
 export { aiAssistApi } from './aiAssistApi';
 export { youtubeCommentsApi } from './youtubeCommentsApi';
+export { savedCommentsApi } from './savedCommentsApi';

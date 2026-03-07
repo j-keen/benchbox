@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { videosApi, aiAssistApi, youtubeCommentsApi } from '../utils/api';
+import { videosApi, aiAssistApi, youtubeCommentsApi, savedCommentsApi } from '../utils/api';
 import { getPlatformIcon, getPlatformColor, getPlatformName } from '../utils/platformIcons';
 import TagInput from './TagInput';
 import useModalHistory from '../hooks/useModalHistory';
@@ -27,6 +27,12 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
     const [commentsDisabled, setCommentsDisabled] = useState(false);
     const [showComments, setShowComments] = useState(false);
     const [linkCopied, setLinkCopied] = useState(false);
+
+    // 저장한 댓글
+    const [savedComments, setSavedComments] = useState([]);
+    const [savingCommentIdx, setSavingCommentIdx] = useState(null);
+    const [memoInputIdx, setMemoInputIdx] = useState(null);
+    const [memoInputValue, setMemoInputValue] = useState('');
 
     const PlatformIcon = getPlatformIcon(video?.platform);
     const platformColor = getPlatformColor(video?.platform);
@@ -159,13 +165,71 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
         setCommentsLoading(true);
         setShowComments(true);
         try {
-            const result = await youtubeCommentsApi.getComments(video.url);
+            const [result, saved] = await Promise.all([
+                youtubeCommentsApi.getComments(video.url),
+                savedCommentsApi.getByVideoId(video.id),
+            ]);
             setComments(result.comments || []);
             setCommentsDisabled(result.disabled || false);
+            setSavedComments(saved);
         } catch (error) {
             console.error('댓글 로드 오류:', error);
         } finally {
             setCommentsLoading(false);
+        }
+    };
+
+    // 댓글이 이미 저장되었는지 확인
+    const isCommentSaved = (comment) => {
+        return savedComments.some(sc => sc.author === comment.author && sc.text === comment.text);
+    };
+
+    // 저장된 댓글의 ID 찾기
+    const getSavedCommentId = (comment) => {
+        const found = savedComments.find(sc => sc.author === comment.author && sc.text === comment.text);
+        return found?.id;
+    };
+
+    // 댓글 북마크 토글
+    const handleToggleBookmark = async (comment, idx) => {
+        const savedId = getSavedCommentId(comment);
+        if (savedId) {
+            // 이미 저장됨 → 삭제
+            setSavingCommentIdx(idx);
+            try {
+                await savedCommentsApi.delete(savedId);
+                setSavedComments(prev => prev.filter(sc => sc.id !== savedId));
+            } catch (error) {
+                console.error('댓글 삭제 오류:', error);
+            } finally {
+                setSavingCommentIdx(null);
+            }
+        } else {
+            // 메모 입력 UI 열기
+            setMemoInputIdx(idx);
+            setMemoInputValue('');
+        }
+    };
+
+    // 메모와 함께 댓글 저장
+    const handleSaveComment = async (comment, idx) => {
+        setSavingCommentIdx(idx);
+        setMemoInputIdx(null);
+        try {
+            const saved = await savedCommentsApi.create({
+                video_id: video.id,
+                author: comment.author,
+                text: comment.text,
+                like_count: comment.likeCount || 0,
+                published_at: comment.publishedAt || null,
+                memo: memoInputValue,
+            });
+            setSavedComments(prev => [saved, ...prev]);
+        } catch (error) {
+            console.error('댓글 저장 오류:', error);
+        } finally {
+            setSavingCommentIdx(null);
+            setMemoInputValue('');
         }
     };
 
@@ -487,19 +551,109 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                                             <div key={idx} className="px-3 py-2 bg-gray-50 rounded-lg">
                                                 <div className="flex items-center justify-between mb-1">
                                                     <span className="text-xs font-medium text-gray-700">{comment.author}</span>
-                                                    {comment.likeCount > 0 && (
-                                                        <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
-                                                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                                                <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                                                            </svg>
-                                                            {comment.likeCount}
-                                                        </span>
-                                                    )}
+                                                    <div className="flex items-center gap-1.5">
+                                                        {comment.likeCount > 0 && (
+                                                            <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                                                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                                    <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                                                                </svg>
+                                                                {comment.likeCount}
+                                                            </span>
+                                                        )}
+                                                        <button
+                                                            onClick={() => handleToggleBookmark(comment, idx)}
+                                                            disabled={savingCommentIdx === idx}
+                                                            className="p-0.5 transition-colors"
+                                                            title={isCommentSaved(comment) ? '저장 취소' : '댓글 저장'}
+                                                        >
+                                                            {savingCommentIdx === idx ? (
+                                                                <div className="w-3.5 h-3.5 border border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+                                                            ) : isCommentSaved(comment) ? (
+                                                                <svg className="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                                                                    <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
+                                                                </svg>
+                                                            ) : (
+                                                                <svg className="w-3.5 h-3.5 text-gray-400 hover:text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                                                                </svg>
+                                                            )}
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 <p className="text-xs text-gray-600 whitespace-pre-wrap line-clamp-4">{comment.text}</p>
+                                                {/* 메모 입력 UI */}
+                                                {memoInputIdx === idx && (
+                                                    <div className="mt-2 flex gap-1.5">
+                                                        <input
+                                                            type="text"
+                                                            value={memoInputValue}
+                                                            onChange={(e) => setMemoInputValue(e.target.value)}
+                                                            onKeyDown={(e) => e.key === 'Enter' && handleSaveComment(comment, idx)}
+                                                            placeholder="메모 (선택사항)"
+                                                            className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-amber-400 focus:border-transparent"
+                                                            autoFocus
+                                                        />
+                                                        <button
+                                                            onClick={() => handleSaveComment(comment, idx)}
+                                                            className="px-2 py-1 text-xs bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors"
+                                                        >
+                                                            저장
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setMemoInputIdx(null)}
+                                                            className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
+                                                        >
+                                                            취소
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                {/* 저장된 메모 표시 */}
+                                                {isCommentSaved(comment) && savedComments.find(sc => sc.author === comment.author && sc.text === comment.text)?.memo && (
+                                                    <div className="mt-1 px-2 py-1 bg-amber-50 rounded text-[10px] text-amber-700">
+                                                        {savedComments.find(sc => sc.author === comment.author && sc.text === comment.text).memo}
+                                                    </div>
+                                                )}
                                             </div>
                                         ))
                                     )}
+                                </div>
+                            )}
+
+                            {/* 저장한 댓글 섹션 */}
+                            {savedComments.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                    <h4 className="text-xs font-medium text-amber-600 mb-2 flex items-center gap-1">
+                                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
+                                        </svg>
+                                        저장한 댓글 ({savedComments.length})
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {savedComments.map(sc => (
+                                            <div key={sc.id} className="px-3 py-2 bg-amber-50 rounded-lg border border-amber-100">
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className="text-xs font-medium text-gray-700">{sc.author}</span>
+                                                    <button
+                                                        onClick={async () => {
+                                                            try {
+                                                                await savedCommentsApi.delete(sc.id);
+                                                                setSavedComments(prev => prev.filter(c => c.id !== sc.id));
+                                                            } catch (err) { console.error(err); }
+                                                        }}
+                                                        className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
+                                                    >
+                                                        삭제
+                                                    </button>
+                                                </div>
+                                                <p className="text-xs text-gray-600 whitespace-pre-wrap">{sc.text}</p>
+                                                {sc.memo && (
+                                                    <div className="mt-1 px-2 py-1 bg-white rounded text-[10px] text-amber-700">
+                                                        {sc.memo}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                         </div>

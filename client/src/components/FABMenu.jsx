@@ -139,6 +139,7 @@ export default function FABMenu({
         { label: '채널 전체보기', to: '/channels' },
         { label: '영상 전체보기', to: '/videos' },
         { label: '폴더 탐색', to: '/browse' },
+        { label: '저장한 댓글', to: '/saved-comments' },
     ];
 
     // 사용 팁
