@@ -63,6 +63,15 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
         }
     }, [memo, tags]);
 
+    // 모달 열릴 때 저장 댓글 로드
+    useEffect(() => {
+        if (video?.id) {
+            savedCommentsApi.getByVideoId(video.id).then(data => {
+                setSavedComments(data);
+            }).catch(err => console.error('저장 댓글 로드 오류:', err));
+        }
+    }, [video?.id]);
+
     useEffect(() => {
         setEmbedFailed(false);
         setEmbedLoading(true);
@@ -619,43 +628,44 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                                 </div>
                             )}
 
-                            {/* 저장한 댓글 섹션 */}
-                            {savedComments.length > 0 && (
-                                <div className="mt-3 pt-3 border-t border-gray-200">
-                                    <h4 className="text-xs font-medium text-amber-600 mb-2 flex items-center gap-1">
-                                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
-                                        </svg>
-                                        저장한 댓글 ({savedComments.length})
-                                    </h4>
-                                    <div className="space-y-2">
-                                        {savedComments.map(sc => (
-                                            <div key={sc.id} className="px-3 py-2 bg-amber-50 rounded-lg border border-amber-100">
-                                                <div className="flex items-center justify-between mb-1">
-                                                    <span className="text-xs font-medium text-gray-700">{sc.author}</span>
-                                                    <button
-                                                        onClick={async () => {
-                                                            try {
-                                                                await savedCommentsApi.delete(sc.id);
-                                                                setSavedComments(prev => prev.filter(c => c.id !== sc.id));
-                                                            } catch (err) { console.error(err); }
-                                                        }}
-                                                        className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
-                                                    >
-                                                        삭제
-                                                    </button>
-                                                </div>
-                                                <p className="text-xs text-gray-600 whitespace-pre-wrap">{sc.text}</p>
-                                                {sc.memo && (
-                                                    <div className="mt-1 px-2 py-1 bg-white rounded text-[10px] text-amber-700">
-                                                        {sc.memo}
-                                                    </div>
-                                                )}
+                        </div>
+                    )}
+
+                    {/* 저장한 댓글 섹션 (항상 표시) */}
+                    {savedComments.length > 0 && (
+                        <div className="px-3 sm:px-6 pb-3 sm:pb-6">
+                            <h4 className="text-xs font-medium text-amber-600 mb-2 flex items-center gap-1">
+                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
+                                </svg>
+                                저장한 댓글 ({savedComments.length})
+                            </h4>
+                            <div className="space-y-2">
+                                {savedComments.map(sc => (
+                                    <div key={sc.id} className="px-3 py-2 bg-amber-50 rounded-lg border border-amber-100">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-xs font-medium text-gray-700">{sc.author}</span>
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        await savedCommentsApi.delete(sc.id);
+                                                        setSavedComments(prev => prev.filter(c => c.id !== sc.id));
+                                                    } catch (err) { console.error(err); }
+                                                }}
+                                                className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
+                                            >
+                                                삭제
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-gray-600 whitespace-pre-wrap">{sc.text}</p>
+                                        {sc.memo && (
+                                            <div className="mt-1 px-2 py-1 bg-white rounded text-[10px] text-amber-700">
+                                                {sc.memo}
                                             </div>
-                                        ))}
+                                        )}
                                     </div>
-                                </div>
-                            )}
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>
