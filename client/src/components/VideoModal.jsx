@@ -70,7 +70,7 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                 setSavedComments(data);
             }).catch(err => console.error('저장 댓글 로드 오류:', err));
         }
-    }, [video?.id]);
+    }, [video]);
 
     useEffect(() => {
         setEmbedFailed(false);
