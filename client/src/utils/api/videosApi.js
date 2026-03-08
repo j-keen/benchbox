@@ -43,6 +43,11 @@ export const videosApi = {
             query = query.eq('download_check', true);
         }
 
+        // 최소 별점 필터
+        if (params.min_rating) {
+            query = query.gte('rating', params.min_rating);
+        }
+
         switch (params.sort) {
             case 'oldest':
                 query = query.order('created_at', { ascending: true });

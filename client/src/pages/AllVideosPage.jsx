@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { videosApi, tagsApi, parseUrlApi, foldersApi } from '../utils/api';
 import { useToast } from '../contexts/ToastContext';
 import VideoCard from '../components/VideoCard';
@@ -6,6 +6,7 @@ import VideoModal from '../components/VideoModal';
 import QuickUrlModal from '../components/QuickUrlModal';
 import BatchTagModal from '../components/BatchTagModal';
 import NavigationTabs from '../components/NavigationTabs';
+import FilterPanel from '../components/FilterPanel';
 import { getPlatformName } from '../utils/platformIcons';
 import { CATEGORIES } from '../utils/categories';
 import { exportCheckedVideosAsMarkdown, downloadMarkdownFile } from '../utils/exportMarkdown';
@@ -17,6 +18,7 @@ const AllVideosPage = () => {
     const [folders, setFolders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedVideo, setSelectedVideo] = useState(null);
+    const [totalCount, setTotalCount] = useState(0);
 
     // 필터 상태
     const [sortBy, setSortBy] = useState('newest');
@@ -24,6 +26,7 @@ const AllVideosPage = () => {
     const [filterVideoType, setFilterVideoType] = useState('all');
     const [filterTag, setFilterTag] = useState('');
     const [filterCategory, setFilterCategory] = useState('all');
+    const [filterRating, setFilterRating] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
 
     // 모달 상태
@@ -37,20 +40,23 @@ const AllVideosPage = () => {
     // 다운로드 체크된 영상 수
     const checkedCount = videos.filter(v => v.download_check).length;
 
+    // 필터 활성 여부
+    const hasActiveFilters = filterPlatform !== 'all' || filterVideoType !== 'all' ||
+        filterCategory !== 'all' || filterTag !== '' || filterRating !== null || searchQuery !== '';
+
     useEffect(() => {
         loadData();
-    }, [sortBy, filterPlatform, filterVideoType, filterTag, filterCategory, searchQuery]);
+    }, [sortBy, filterPlatform, filterVideoType, filterTag, filterCategory, filterRating, searchQuery]);
 
     const loadData = async () => {
         try {
             setLoading(true);
-            const params = {
-                sort: sortBy,
-            };
+            const params = { sort: sortBy };
             if (filterPlatform !== 'all') params.platform = filterPlatform;
             if (filterVideoType !== 'all') params.video_type = filterVideoType;
             if (filterTag) params.tag = filterTag;
             if (filterCategory !== 'all') params.category = filterCategory;
+            if (filterRating) params.min_rating = filterRating;
             if (searchQuery) params.search = searchQuery;
 
             const [videosRes, tagsRes, foldersRes] = await Promise.all([
@@ -59,14 +65,37 @@ const AllVideosPage = () => {
                 foldersApi.getAll()
             ]);
 
-            setVideos(videosRes.data.videos || []);
+            const loadedVideos = videosRes.data.videos || [];
+            setVideos(loadedVideos);
             setTags(tagsRes.data.tags || []);
             setFolders(foldersRes.data.folders || []);
+
+            // 필터 없을 때만 전체 개수 업데이트
+            if (!hasActiveFilters) {
+                setTotalCount(loadedVideos.length);
+            }
         } catch (error) {
             console.error('데이터 로드 오류:', error);
         } finally {
             setLoading(false);
         }
+    };
+
+    // 전체 개수를 처음 로드 시 기록
+    useEffect(() => {
+        if (!hasActiveFilters && videos.length > 0) {
+            setTotalCount(videos.length);
+        }
+    }, [videos, hasActiveFilters]);
+
+    const handleClearAllFilters = () => {
+        setSortBy('newest');
+        setFilterPlatform('all');
+        setFilterVideoType('all');
+        setFilterTag('');
+        setFilterCategory('all');
+        setFilterRating(null);
+        setSearchQuery('');
     };
 
     const handleQuickAdd = async (url) => {
@@ -177,15 +206,80 @@ const AllVideosPage = () => {
         toast.success(`${checkedVideos.length}개 영상 목록을 내보냈습니다.`);
     };
 
+    // FilterPanel용 필터 그룹 구성
+    const filterGroups = [
+        {
+            key: 'platform',
+            label: '플랫폼',
+            options: [
+                { value: 'all', label: '전체' },
+                { value: 'youtube', label: getPlatformName('youtube') },
+                { value: 'tiktok', label: getPlatformName('tiktok') },
+                { value: 'instagram', label: getPlatformName('instagram') },
+            ],
+            value: filterPlatform,
+            onChange: setFilterPlatform,
+        },
+        {
+            key: 'videoType',
+            label: '형식',
+            options: [
+                { value: 'all', label: '전체' },
+                { value: 'shorts', label: '숏폼' },
+                { value: 'long', label: '롱폼' },
+            ],
+            value: filterVideoType,
+            onChange: setFilterVideoType,
+        },
+        {
+            key: 'category',
+            label: '카테고리',
+            options: [
+                { value: 'all', label: '전체' },
+                ...CATEGORIES.map(cat => ({ value: cat.id, label: `${cat.emoji} ${cat.label}` })),
+            ],
+            value: filterCategory,
+            onChange: setFilterCategory,
+        },
+        ...(tags.length > 0 ? [{
+            key: 'tag',
+            label: '태그',
+            options: [
+                { value: '', label: '전체' },
+                ...tags.map(tag => ({ value: tag.name, label: `#${tag.name}` })),
+            ],
+            value: filterTag,
+            onChange: setFilterTag,
+        }] : []),
+        {
+            key: 'rating',
+            label: '별점',
+            type: 'rating-min',
+            value: filterRating,
+            onChange: setFilterRating,
+        },
+    ];
+
+    const sortGroup = {
+        label: '정렬',
+        options: [
+            { value: 'newest', label: '최신순' },
+            { value: 'oldest', label: '오래된순' },
+            { value: 'title', label: '제목순' },
+            { value: 'rating_desc', label: '별점순' },
+        ],
+        value: sortBy,
+        onChange: setSortBy,
+    };
+
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* 네비게이션 탭 */}
             <NavigationTabs />
 
-            {/* 헤더 */}
             <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
                 <div className="max-w-7xl mx-auto px-4 py-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    {/* 타이틀 + 추가 버튼 */}
+                    <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2 sm:gap-4">
                             <h1 className="text-xl font-bold text-gray-900">전체 영상</h1>
                             <span className="text-xs sm:text-sm text-gray-500">{videos.length}개</span>
@@ -201,91 +295,25 @@ const AllVideosPage = () => {
                                 </button>
                             )}
                         </div>
-
-                        {/* 영상 추가 버튼 + 검색창 */}
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-                            <button
-                                onClick={() => setShowAddModal(true)}
-                                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors min-h-[44px] sm:min-h-0"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                영상 추가
-                            </button>
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="제목, 메모, 태그 검색..."
-                                    className="w-full sm:w-64 pl-9 pr-3 py-2.5 sm:py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                />
-                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                            </div>
-                        </div>
+                        <button
+                            onClick={() => setShowAddModal(true)}
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors min-h-[44px] sm:min-h-0"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span className="hidden sm:inline">영상 추가</span>
+                        </button>
                     </div>
 
-                    {/* 필터 */}
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value)}
-                            className="text-sm border border-gray-200 rounded-lg px-3 py-2 sm:py-1.5 min-h-[44px] sm:min-h-0"
-                        >
-                            <option value="newest">최신순</option>
-                            <option value="oldest">오래된순</option>
-                            <option value="title">제목순</option>
-                            <option value="rating_desc">별점 높은순</option>
-                        </select>
-
-                        <select
-                            value={filterVideoType}
-                            onChange={(e) => setFilterVideoType(e.target.value)}
-                            className="text-sm border border-gray-200 rounded-lg px-3 py-2 sm:py-1.5 min-h-[44px] sm:min-h-0"
-                        >
-                            <option value="all">전체 형식</option>
-                            <option value="shorts">숏폼</option>
-                            <option value="long">롱폼</option>
-                        </select>
-
-                        <select
-                            value={filterPlatform}
-                            onChange={(e) => setFilterPlatform(e.target.value)}
-                            className="text-sm border border-gray-200 rounded-lg px-3 py-2 sm:py-1.5 min-h-[44px] sm:min-h-0"
-                        >
-                            <option value="all">전체 플랫폼</option>
-                            <option value="youtube">{getPlatformName('youtube')}</option>
-                            <option value="tiktok">{getPlatformName('tiktok')}</option>
-                            <option value="instagram">{getPlatformName('instagram')}</option>
-                        </select>
-
-                        <select
-                            value={filterCategory}
-                            onChange={(e) => setFilterCategory(e.target.value)}
-                            className="text-sm border border-gray-200 rounded-lg px-3 py-2 sm:py-1.5 min-h-[44px] sm:min-h-0"
-                        >
-                            <option value="all">전체 카테고리</option>
-                            {CATEGORIES.map(cat => (
-                                <option key={cat.id} value={cat.id}>{cat.emoji} {cat.label}</option>
-                            ))}
-                        </select>
-
-                        {tags.length > 0 && (
-                            <select
-                                value={filterTag}
-                                onChange={(e) => setFilterTag(e.target.value)}
-                                className="text-sm border border-gray-200 rounded-lg px-3 py-2 sm:py-1.5 min-h-[44px] sm:min-h-0"
-                            >
-                                <option value="">전체 태그</option>
-                                {tags.map(tag => (
-                                    <option key={tag.id} value={tag.name}>#{tag.name}</option>
-                                ))}
-                            </select>
-                        )}
-                    </div>
+                    {/* FilterPanel */}
+                    <FilterPanel
+                        searchQuery={searchQuery}
+                        onSearchChange={setSearchQuery}
+                        searchPlaceholder="제목, 메모, 태그 검색..."
+                        filterGroups={filterGroups}
+                        sortGroup={sortGroup}
+                    />
                 </div>
 
                 {/* 선택 툴바 */}
@@ -294,7 +322,6 @@ const AllVideosPage = () => {
                         <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <span className="font-medium">{selectedVideos.size}개 선택됨</span>
                             <div className="flex flex-wrap items-center gap-2">
-                                {/* 폴더로 이동 */}
                                 {folders.length > 0 && (
                                     <select
                                         onChange={(e) => {
@@ -339,7 +366,6 @@ const AllVideosPage = () => {
                 )}
             </header>
 
-            {/* 메인 콘텐츠 */}
             <main className="max-w-7xl mx-auto px-4 py-6">
                 {loading ? (
                     <div className="flex items-center justify-center py-12">
@@ -347,7 +373,6 @@ const AllVideosPage = () => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        {/* 영상 추가 카드 */}
                         <div>
                             <div
                                 onClick={() => setShowAddModal(true)}
@@ -360,7 +385,6 @@ const AllVideosPage = () => {
                             </div>
                         </div>
 
-                        {/* 영상 카드들 */}
                         {videos.map(video => (
                             <div key={video.id}>
                                 <VideoCard
@@ -376,17 +400,34 @@ const AllVideosPage = () => {
                     </div>
                 )}
 
+                {/* 빈 결과 - 필터 있을 때 개선된 안내 */}
                 {!loading && videos.length === 0 && (
                     <div className="text-center py-12 text-gray-500">
                         <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                         </svg>
-                        <p>등록된 영상이 없습니다</p>
+                        {hasActiveFilters ? (
+                            <>
+                                <p className="mb-2">검색 결과가 없습니다</p>
+                                {totalCount > 0 && (
+                                    <p className="text-sm text-gray-400 mb-4">
+                                        필터를 해제하면 전체 {totalCount}개 영상을 볼 수 있어요
+                                    </p>
+                                )}
+                                <button
+                                    onClick={handleClearAllFilters}
+                                    className="px-4 py-2 text-sm bg-primary-50 text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
+                                >
+                                    필터 초기화
+                                </button>
+                            </>
+                        ) : (
+                            <p>등록된 영상이 없습니다</p>
+                        )}
                     </div>
                 )}
             </main>
 
-            {/* 영상 상세 모달 */}
             {selectedVideo && (
                 <VideoModal
                     video={selectedVideo}
@@ -396,7 +437,6 @@ const AllVideosPage = () => {
                 />
             )}
 
-            {/* 영상 추가 모달 */}
             {showAddModal && (
                 <QuickUrlModal
                     title="영상 추가"
@@ -406,7 +446,6 @@ const AllVideosPage = () => {
                 />
             )}
 
-            {/* 일괄 태그 추가 모달 */}
             {showBatchTagModal && (
                 <BatchTagModal
                     selectedCount={selectedVideos.size}

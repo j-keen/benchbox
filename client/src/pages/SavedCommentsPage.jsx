@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { savedCommentsApi } from '../utils/api';
 import { getPlatformIcon, getPlatformColor } from '../utils/platformIcons';
 import NavigationTabs from '../components/NavigationTabs';
+import FilterPanel from '../components/FilterPanel';
 
 const SavedCommentsPage = () => {
     const navigate = useNavigate();
@@ -10,6 +11,10 @@ const SavedCommentsPage = () => {
     const [loading, setLoading] = useState(true);
     const [editingId, setEditingId] = useState(null);
     const [editMemo, setEditMemo] = useState('');
+
+    // 필터 상태
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterVideoId, setFilterVideoId] = useState('all');
 
     useEffect(() => {
         loadComments();
@@ -26,6 +31,38 @@ const SavedCommentsPage = () => {
             setLoading(false);
         }
     };
+
+    // 연결된 영상 목록 추출
+    const linkedVideos = useMemo(() => {
+        const map = new Map();
+        comments.forEach(c => {
+            if (c.videos) map.set(c.videos.id, c.videos);
+        });
+        return Array.from(map.values());
+    }, [comments]);
+
+    // 클라이언트 사이드 필터링
+    const filteredComments = useMemo(() => {
+        return comments.filter(comment => {
+            // 텍스트 검색
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                const textMatch = comment.text?.toLowerCase().includes(q);
+                const authorMatch = comment.author?.toLowerCase().includes(q);
+                const memoMatch = comment.memo?.toLowerCase().includes(q);
+                if (!textMatch && !authorMatch && !memoMatch) return false;
+            }
+
+            // 영상 필터
+            if (filterVideoId !== 'all') {
+                if (!comment.videos || comment.videos.id !== filterVideoId) return false;
+            }
+
+            return true;
+        });
+    }, [comments, searchQuery, filterVideoId]);
+
+    const hasActiveFilters = searchQuery !== '' || filterVideoId !== 'all';
 
     const handleDelete = async (id) => {
         try {
@@ -51,6 +88,23 @@ const SavedCommentsPage = () => {
         }
     };
 
+    // 필터 그룹 구성
+    const filterGroups = linkedVideos.length > 1 ? [
+        {
+            key: 'video',
+            label: '영상별',
+            options: [
+                { value: 'all', label: '전체' },
+                ...linkedVideos.map(v => ({
+                    value: v.id,
+                    label: v.title?.length > 15 ? v.title.slice(0, 15) + '...' : (v.title || '제목 없음'),
+                })),
+            ],
+            value: filterVideoId,
+            onChange: setFilterVideoId,
+        },
+    ] : [];
+
     return (
         <div className="min-h-screen bg-gray-50">
             <NavigationTabs />
@@ -59,9 +113,21 @@ const SavedCommentsPage = () => {
                 <h1 className="text-lg font-bold text-gray-900 mb-4">
                     저장한 댓글
                     {comments.length > 0 && (
-                        <span className="ml-2 text-sm font-normal text-gray-500">({comments.length})</span>
+                        <span className="ml-2 text-sm font-normal text-gray-500">({filteredComments.length}/{comments.length})</span>
                     )}
                 </h1>
+
+                {/* 검색/필터 (댓글이 있을 때만) */}
+                {comments.length > 0 && (
+                    <div className="mb-4">
+                        <FilterPanel
+                            searchQuery={searchQuery}
+                            onSearchChange={setSearchQuery}
+                            searchPlaceholder="댓글, 작성자, 메모 검색..."
+                            filterGroups={filterGroups}
+                        />
+                    </div>
+                )}
 
                 {loading ? (
                     <div className="flex items-center justify-center py-12">
@@ -75,16 +141,31 @@ const SavedCommentsPage = () => {
                         <p className="text-sm text-gray-500 mb-1">저장한 댓글이 없습니다</p>
                         <p className="text-xs text-gray-400">영상 상세에서 인기 댓글의 북마크 버튼을 눌러 저장하세요</p>
                     </div>
+                ) : filteredComments.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                        <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <p className="text-sm mb-2">검색 결과가 없습니다</p>
+                        <p className="text-xs text-gray-400 mb-4">
+                            필터를 해제하면 전체 {comments.length}개 댓글을 볼 수 있어요
+                        </p>
+                        <button
+                            onClick={() => { setSearchQuery(''); setFilterVideoId('all'); }}
+                            className="px-4 py-2 text-sm bg-primary-50 text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
+                        >
+                            필터 초기화
+                        </button>
+                    </div>
                 ) : (
                     <div className="space-y-3">
-                        {comments.map(comment => {
+                        {filteredComments.map(comment => {
                             const video = comment.videos;
                             const PlatformIcon = video ? getPlatformIcon(video.platform) : null;
                             const platformColor = video ? getPlatformColor(video.platform) : '';
 
                             return (
                                 <div key={comment.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                                    {/* 출처 영상 */}
                                     {video && (
                                         <button
                                             onClick={() => navigate(`/videos?video=${video.id}`)}
@@ -104,7 +185,6 @@ const SavedCommentsPage = () => {
                                         </button>
                                     )}
 
-                                    {/* 댓글 본문 */}
                                     <div className="px-4 py-3">
                                         <div className="flex items-center justify-between mb-1.5">
                                             <span className="text-xs font-medium text-gray-700">{comment.author}</span>
@@ -119,7 +199,6 @@ const SavedCommentsPage = () => {
                                         </div>
                                         <p className="text-sm text-gray-600 whitespace-pre-wrap">{comment.text}</p>
 
-                                        {/* 메모 */}
                                         {editingId === comment.id ? (
                                             <div className="mt-2 flex gap-1.5">
                                                 <input
@@ -152,7 +231,6 @@ const SavedCommentsPage = () => {
                                             </div>
                                         ) : null}
 
-                                        {/* 액션 버튼 */}
                                         <div className="mt-2 flex items-center gap-2 justify-end">
                                             <button
                                                 onClick={() => handleStartEdit(comment)}
