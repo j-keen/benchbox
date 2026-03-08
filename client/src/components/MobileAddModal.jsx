@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import TagInput from './TagInput';
+import SaveLocationPicker from './SaveLocationPicker';
 import { getPlatformIcon, getPlatformColor, getPlatformName } from '../utils/platformIcons';
 import { aiAssistApi } from '../utils/api';
 import useModalHistory from '../hooks/useModalHistory';
 
-export default function MobileAddModal({ preview, channels, currentChannelId, onSave, onClose }) {
+export default function MobileAddModal({ preview, channels, folders = [], currentChannelId, onSave, onClose, onChannelsChange, onFoldersChange }) {
   useModalHistory(true, onClose);
   const [memo, setMemo] = useState('');
   const [tags, setTags] = useState([]);
   const [selectedChannelId, setSelectedChannelId] = useState(currentChannelId || null);
+  const [selectedFolderId, setSelectedFolderId] = useState(null);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [aiMemoLoading, setAiMemoLoading] = useState(false);
   const [aiTagsLoading, setAiTagsLoading] = useState(false);
   const [suggestedTags, setSuggestedTags] = useState([]);
@@ -18,11 +21,31 @@ export default function MobileAddModal({ preview, channels, currentChannelId, on
     onSave({
       url: preview.original_url,
       channel_id: preview.type === 'channel' ? null : selectedChannelId,
+      folder_id: preview.type === 'channel' ? null : selectedFolderId,
       isChannel: preview.type === 'channel',
       memo,
       tags,
       ...preview
     });
+  };
+
+  const handleLocationSelect = ({ channelId, folderId }) => {
+    setSelectedChannelId(channelId);
+    setSelectedFolderId(folderId);
+    setShowLocationPicker(false);
+  };
+
+  // 선택된 위치의 표시 이름 계산
+  const getLocationLabel = () => {
+    if (selectedFolderId) {
+      const folder = folders.find(f => f.id === selectedFolderId);
+      return folder ? `📁 ${folder.name}` : '개별 영상 (홈)';
+    }
+    if (selectedChannelId) {
+      const channel = channels.find(c => c.id === selectedChannelId);
+      return channel ? `📺 ${channel.title}` : '개별 영상 (홈)';
+    }
+    return '개별 영상 (홈)';
   };
 
   const handleAiRefineMemo = async () => {
@@ -237,37 +260,19 @@ export default function MobileAddModal({ preview, channels, currentChannelId, on
             )}
           </div>
 
-          {/* Save Location */}
-          {preview.type !== 'channel' && channels.length > 0 && (
+          {/* Save Location - 접힌 row */}
+          {preview.type !== 'channel' && (
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">저장 위치</label>
-            <div className="space-y-1 max-h-32 overflow-y-auto">
-              <label className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded cursor-pointer">
-                <input
-                  type="radio"
-                  name="channel"
-                  checked={selectedChannelId === null}
-                  onChange={() => setSelectedChannelId(null)}
-                  className="text-primary-500"
-                />
-                <span className="text-sm">개별 영상 (홈)</span>
-              </label>
-              {channels.map((channel) => (
-                <label
-                  key={channel.id}
-                  className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded cursor-pointer"
-                >
-                  <input
-                    type="radio"
-                    name="channel"
-                    checked={selectedChannelId === channel.id}
-                    onChange={() => setSelectedChannelId(channel.id)}
-                    className="text-primary-500"
-                  />
-                  <span className="text-sm">{channel.title}</span>
-                </label>
-              ))}
-            </div>
+            <button
+              onClick={() => setShowLocationPicker(true)}
+              className="w-full flex items-center justify-between p-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-left"
+            >
+              <span className="text-sm text-gray-900 truncate">{getLocationLabel()}</span>
+              <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
           )}
         </div>
@@ -288,6 +293,20 @@ export default function MobileAddModal({ preview, channels, currentChannelId, on
           </button>
         </div>
       </div>
+
+      {/* SaveLocationPicker 서브 모달 */}
+      {showLocationPicker && (
+        <SaveLocationPicker
+          channels={channels}
+          folders={folders}
+          selectedChannelId={selectedChannelId}
+          selectedFolderId={selectedFolderId}
+          onSelect={handleLocationSelect}
+          onClose={() => setShowLocationPicker(false)}
+          onChannelsChange={onChannelsChange}
+          onFoldersChange={onFoldersChange}
+        />
+      )}
     </div>
   );
 }

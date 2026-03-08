@@ -239,6 +239,7 @@ const Home = () => {
                     thumbnail: data.thumbnail,
                     description: data.description
                 };
+                if (data.folder_id) createData.folder_id = data.folder_id;
                 if (data.memo) createData.memo = data.memo;
                 if (data.tags && data.tags.length > 0) createData.tags = data.tags;
                 const response = await videosApi.create(createData);
@@ -1652,11 +1653,14 @@ const Home = () => {
                 <MobileAddModal
                     preview={mobileAddPreview}
                     channels={channels}
+                    folders={folders}
                     onSave={handleSaveUrl}
                     onClose={() => {
                         setShowMobileAddModal(false);
                         setMobileAddPreview(null);
                     }}
+                    onChannelsChange={setChannels}
+                    onFoldersChange={setFolders}
                 />
             )}
         </div>

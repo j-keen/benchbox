@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import useModalHistory from '../hooks/useModalHistory';
 
-const FOLDER_COLORS = [
+export const FOLDER_COLORS = [
     '#6366f1', // indigo
     '#8b5cf6', // violet
     '#ec4899', // pink

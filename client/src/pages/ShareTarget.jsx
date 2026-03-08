@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { parseUrlApi, videosApi, channelsApi } from '../utils/api';
+import { parseUrlApi, videosApi, channelsApi, foldersApi } from '../utils/api';
 import { useToast } from '../contexts/ToastContext';
 import MobileAddModal from '../components/MobileAddModal';
 
@@ -30,6 +30,7 @@ export default function ShareTarget() {
   const [error, setError] = useState(null);
   const [preview, setPreview] = useState(null);
   const [channels, setChannels] = useState([]);
+  const [folders, setFolders] = useState([]);
 
   const sharedUrl = extractUrl(searchParams);
 
@@ -44,9 +45,10 @@ export default function ShareTarget() {
 
     async function load() {
       try {
-        const [parseResult, channelsResult] = await Promise.all([
+        const [parseResult, channelsResult, foldersResult] = await Promise.all([
           parseUrlApi.parse(sharedUrl),
           channelsApi.getAll(),
+          foldersApi.getAll(),
         ]);
 
         if (cancelled) return;
@@ -56,6 +58,7 @@ export default function ShareTarget() {
           original_url: sharedUrl,
         });
         setChannels(channelsResult.data.channels || []);
+        setFolders(foldersResult.data.folders || []);
       } catch (err) {
         if (!cancelled) {
           setError('URL 분석에 실패했습니다.');
@@ -130,9 +133,12 @@ export default function ShareTarget() {
       <MobileAddModal
         preview={preview}
         channels={channels}
+        folders={folders}
         currentChannelId={null}
         onSave={handleSave}
         onClose={handleClose}
+        onChannelsChange={setChannels}
+        onFoldersChange={setFolders}
       />
     );
   }
