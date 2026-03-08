@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { videosApi, aiAssistApi, youtubeCommentsApi, savedCommentsApi } from '../utils/api';
 import { getPlatformIcon, getPlatformColor, getPlatformName } from '../utils/platformIcons';
 import TagInput from './TagInput';
@@ -36,8 +36,10 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
     // 저장한 댓글
     const [savedComments, setSavedComments] = useState([]);
     const [savingCommentIdx, setSavingCommentIdx] = useState(null);
-    const [memoInputIdx, setMemoInputIdx] = useState(null);
-    const [memoInputValue, setMemoInputValue] = useState('');
+    const [memoPopup, setMemoPopup] = useState(null); // { comment, idx, savedId, existingMemo }
+    const [memoPopupValue, setMemoPopupValue] = useState('');
+    const pressTimer = useRef(null);
+    const isLongPress = useRef(false);
 
     const PlatformIcon = getPlatformIcon(video?.platform);
     const platformColor = getPlatformColor(video?.platform);
@@ -213,8 +215,87 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
         return found?.id;
     };
 
-    // 댓글 북마크 토글
-    const handleToggleBookmark = async (comment, idx) => {
+    // 저장된 댓글 전체 객체 반환 (메모 프리필용)
+    const getSavedComment = (comment) => {
+        return savedComments.find(sc => sc.author === comment.author && sc.text === comment.text);
+    };
+
+    // 메모 없이 즉시 저장
+    const handleQuickSave = async (comment, idx) => {
+        setSavingCommentIdx(idx);
+        try {
+            const saved = await savedCommentsApi.create({
+                video_id: video.id,
+                author: comment.author,
+                text: comment.text,
+                like_count: comment.likeCount || 0,
+                published_at: comment.publishedAt || null,
+                memo: '',
+            });
+            setSavedComments(prev => [saved, ...prev]);
+        } catch (error) {
+            console.error('댓글 저장 오류:', error);
+        } finally {
+            setSavingCommentIdx(null);
+        }
+    };
+
+    // 메모 팝업에서 저장/수정
+    const handleMemoPopupSave = async () => {
+        if (!memoPopup) return;
+        const { comment, idx, savedId } = memoPopup;
+        setSavingCommentIdx(idx);
+        setMemoPopup(null);
+        try {
+            if (savedId) {
+                // 기존 메모 수정
+                await savedCommentsApi.update(savedId, { memo: memoPopupValue });
+                setSavedComments(prev => prev.map(sc => sc.id === savedId ? { ...sc, memo: memoPopupValue } : sc));
+            } else {
+                // 새로 저장 (메모 포함)
+                const saved = await savedCommentsApi.create({
+                    video_id: video.id,
+                    author: comment.author,
+                    text: comment.text,
+                    like_count: comment.likeCount || 0,
+                    published_at: comment.publishedAt || null,
+                    memo: memoPopupValue,
+                });
+                setSavedComments(prev => [saved, ...prev]);
+            }
+        } catch (error) {
+            console.error('댓글 메모 저장 오류:', error);
+        } finally {
+            setSavingCommentIdx(null);
+            setMemoPopupValue('');
+        }
+    };
+
+    // 메모 팝업 열기 헬퍼
+    const openMemoPopup = (comment, idx) => {
+        const saved = getSavedComment(comment);
+        setMemoPopup({
+            comment,
+            idx,
+            savedId: saved?.id || null,
+            existingMemo: saved?.memo || '',
+        });
+        setMemoPopupValue(saved?.memo || '');
+    };
+
+    // 롱프레스 감지: 포인터 다운
+    const handleBookmarkPointerDown = (comment, idx) => {
+        isLongPress.current = false;
+        pressTimer.current = setTimeout(() => {
+            isLongPress.current = true;
+            openMemoPopup(comment, idx);
+        }, 400);
+    };
+
+    // 롱프레스 감지: 포인터 업 (짧은 탭)
+    const handleBookmarkPointerUp = async (comment, idx) => {
+        clearTimeout(pressTimer.current);
+        if (isLongPress.current) return; // 롱프레스는 이미 처리됨
         const savedId = getSavedCommentId(comment);
         if (savedId) {
             // 이미 저장됨 → 삭제
@@ -228,32 +309,14 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                 setSavingCommentIdx(null);
             }
         } else {
-            // 메모 입력 UI 열기
-            setMemoInputIdx(idx);
-            setMemoInputValue('');
+            // 즉시 저장 (메모 없이)
+            await handleQuickSave(comment, idx);
         }
     };
 
-    // 메모와 함께 댓글 저장
-    const handleSaveComment = async (comment, idx) => {
-        setSavingCommentIdx(idx);
-        setMemoInputIdx(null);
-        try {
-            const saved = await savedCommentsApi.create({
-                video_id: video.id,
-                author: comment.author,
-                text: comment.text,
-                like_count: comment.likeCount || 0,
-                published_at: comment.publishedAt || null,
-                memo: memoInputValue,
-            });
-            setSavedComments(prev => [saved, ...prev]);
-        } catch (error) {
-            console.error('댓글 저장 오류:', error);
-        } finally {
-            setSavingCommentIdx(null);
-            setMemoInputValue('');
-        }
+    // 롱프레스 감지: 포인터 떠남
+    const handleBookmarkPointerLeave = () => {
+        clearTimeout(pressTimer.current);
     };
 
     const formatDate = (dateString) => {
@@ -614,10 +677,13 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                                                             </span>
                                                         )}
                                                         <button
-                                                            onClick={() => handleToggleBookmark(comment, idx)}
+                                                            onPointerDown={() => handleBookmarkPointerDown(comment, idx)}
+                                                            onPointerUp={() => handleBookmarkPointerUp(comment, idx)}
+                                                            onPointerLeave={handleBookmarkPointerLeave}
+                                                            onContextMenu={(e) => e.preventDefault()}
                                                             disabled={savingCommentIdx === idx}
-                                                            className="p-0.5 transition-colors"
-                                                            title={isCommentSaved(comment) ? '저장 취소' : '댓글 저장'}
+                                                            className="p-0.5 transition-colors select-none touch-none"
+                                                            title={isCommentSaved(comment) ? '탭: 저장 취소 / 길게 누르기: 메모' : '탭: 즉시 저장 / 길게 누르기: 메모와 함께 저장'}
                                                         >
                                                             {savingCommentIdx === idx ? (
                                                                 <div className="w-3.5 h-3.5 border border-amber-400 border-t-transparent rounded-full animate-spin"></div>
@@ -631,35 +697,21 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                                                                 </svg>
                                                             )}
                                                         </button>
+                                                        {/* 데스크탑 메모 아이콘 - 저장된 댓글에만 */}
+                                                        {isCommentSaved(comment) && (
+                                                            <button
+                                                                onClick={() => openMemoPopup(comment, idx)}
+                                                                className="hidden sm:inline-flex p-0.5 text-gray-400 hover:text-amber-500 transition-colors"
+                                                                title="메모 편집"
+                                                            >
+                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                                </svg>
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 <p className="text-xs text-gray-600 whitespace-pre-wrap line-clamp-4">{comment.text}</p>
-                                                {/* 메모 입력 UI */}
-                                                {memoInputIdx === idx && (
-                                                    <div className="mt-2 flex gap-1.5">
-                                                        <input
-                                                            type="text"
-                                                            value={memoInputValue}
-                                                            onChange={(e) => setMemoInputValue(e.target.value)}
-                                                            onKeyDown={(e) => e.key === 'Enter' && handleSaveComment(comment, idx)}
-                                                            placeholder="메모 (선택사항)"
-                                                            className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-amber-400 focus:border-transparent"
-                                                            autoFocus
-                                                        />
-                                                        <button
-                                                            onClick={() => handleSaveComment(comment, idx)}
-                                                            className="px-2 py-1 text-xs bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors"
-                                                        >
-                                                            저장
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setMemoInputIdx(null)}
-                                                            className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
-                                                        >
-                                                            취소
-                                                        </button>
-                                                    </div>
-                                                )}
                                                 {/* 저장된 메모 표시 */}
                                                 {isCommentSaved(comment) && savedComments.find(sc => sc.author === comment.author && sc.text === comment.text)?.memo && (
                                                     <div className="mt-1 px-2 py-1 bg-amber-50 rounded text-[10px] text-amber-700">
@@ -689,17 +741,33 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                                     <div key={sc.id} className="px-3 py-2 bg-amber-50 rounded-lg border border-amber-100">
                                         <div className="flex items-center justify-between mb-1">
                                             <span className="text-xs font-medium text-gray-700">{sc.author}</span>
-                                            <button
-                                                onClick={async () => {
-                                                    try {
-                                                        await savedCommentsApi.delete(sc.id);
-                                                        setSavedComments(prev => prev.filter(c => c.id !== sc.id));
-                                                    } catch (err) { console.error(err); }
-                                                }}
-                                                className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
-                                            >
-                                                삭제
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        setMemoPopup({
+                                                            comment: { author: sc.author, text: sc.text, likeCount: sc.like_count, publishedAt: sc.published_at },
+                                                            idx: -1,
+                                                            savedId: sc.id,
+                                                            existingMemo: sc.memo || '',
+                                                        });
+                                                        setMemoPopupValue(sc.memo || '');
+                                                    }}
+                                                    className="text-[10px] text-gray-400 hover:text-amber-500 transition-colors"
+                                                >
+                                                    메모
+                                                </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            await savedCommentsApi.delete(sc.id);
+                                                            setSavedComments(prev => prev.filter(c => c.id !== sc.id));
+                                                        } catch (err) { console.error(err); }
+                                                    }}
+                                                    className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
+                                                >
+                                                    삭제
+                                                </button>
+                                            </div>
                                         </div>
                                         <p className="text-xs text-gray-600 whitespace-pre-wrap">{sc.text}</p>
                                         {sc.memo && (
@@ -750,6 +818,42 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                     </button>
                 </div>
             </div>
+
+            {/* 메모 팝업 모달 */}
+            {memoPopup && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={() => setMemoPopup(null)}>
+                    <div className="bg-white rounded-xl shadow-2xl w-[90vw] max-w-md p-4 mx-4" onClick={e => e.stopPropagation()}>
+                        {/* 댓글 미리보기 */}
+                        <div className="mb-3 px-3 py-2 bg-gray-50 rounded-lg">
+                            <span className="text-xs font-medium text-gray-700">{memoPopup.comment.author}</span>
+                            <p className="text-xs text-gray-600 mt-1 line-clamp-3 whitespace-pre-wrap">{memoPopup.comment.text}</p>
+                        </div>
+                        {/* 메모 입력 */}
+                        <textarea
+                            value={memoPopupValue}
+                            onChange={(e) => setMemoPopupValue(e.target.value)}
+                            placeholder="메모를 남겨보세요..."
+                            className="w-full min-h-[80px] p-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none"
+                            autoFocus
+                        />
+                        {/* 버튼 */}
+                        <div className="flex justify-end gap-2 mt-3">
+                            <button
+                                onClick={() => setMemoPopup(null)}
+                                className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={handleMemoPopupSave}
+                                className="px-3 py-1.5 text-xs bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+                            >
+                                {memoPopup.savedId ? '메모 수정' : '메모와 함께 저장'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
