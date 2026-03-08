@@ -143,12 +143,6 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
             )}
           </div>
 
-          {/* 별점 */}
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">별점</label>
-            <StarRating rating={rating} onChange={setRating} />
-          </div>
-
           {/* 썸네일 (9:16) + 메모 가로 배치 */}
           <div className="flex gap-3">
             {/* 9:16 썸네일 */}
@@ -171,7 +165,10 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
             {/* 메모 (썸네일 높이에 맞춤) */}
             <div className="flex-1 flex flex-col min-w-0">
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-medium text-gray-500">메모</label>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-gray-500">메모</label>
+                  <StarRating rating={rating} onChange={setRating} size="sm" />
+                </div>
                 <div className="flex items-center gap-1">
                   {originalMemo !== null && (
                     <button
