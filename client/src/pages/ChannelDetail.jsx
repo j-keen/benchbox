@@ -257,6 +257,15 @@ const ChannelDetail = () => {
         });
     };
 
+    const handleToggleDownloadCheck = async (videoId, checked) => {
+        try {
+            await videosApi.update(videoId, { download_check: checked });
+            setVideos(prev => prev.map(v => v.id === videoId ? { ...v, download_check: checked } : v));
+        } catch (error) {
+            console.error('다운로드 체크 오류:', error);
+        }
+    };
+
     // 선택 취소
     const clearSelection = () => {
         setSelectedVideos(new Set());
@@ -722,6 +731,7 @@ const ChannelDetail = () => {
                                         isSelected={selectedVideos.has(video.id)}
                                         onSelect={handleVideoSelect}
                                         selectionMode={selectionMode}
+                                        onToggleDownloadCheck={handleToggleDownloadCheck}
                                     />
                                 </div>
                             ))}

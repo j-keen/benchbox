@@ -242,6 +242,8 @@ const Home = () => {
                 if (data.folder_id) createData.folder_id = data.folder_id;
                 if (data.memo) createData.memo = data.memo;
                 if (data.tags && data.tags.length > 0) createData.tags = data.tags;
+                if (data.categories) createData.categories = data.categories;
+                if (data.rating !== undefined) createData.rating = data.rating;
                 const response = await videosApi.create(createData);
                 if (!data.channel_id) {
                     setVideos(prev => [response.data, ...prev]);
@@ -252,6 +254,16 @@ const Home = () => {
         } catch (error) {
             console.error('저장 오류:', error);
             toast.error(error.response?.data?.error || '저장에 실패했습니다.');
+        }
+    };
+
+    // 다운로드 체크 토글
+    const handleToggleDownloadCheck = async (videoId, checked) => {
+        try {
+            const response = await videosApi.update(videoId, { download_check: checked });
+            setVideos(prev => prev.map(v => v.id === videoId ? { ...v, download_check: checked } : v));
+        } catch (error) {
+            console.error('다운로드 체크 오류:', error);
         }
     };
 
@@ -1523,6 +1535,7 @@ const Home = () => {
                                         onSelect={handleVideoSelect}
                                         selectionMode={selectionMode}
                                         searchQuery={debouncedSearch}
+                                        onToggleDownloadCheck={handleToggleDownloadCheck}
                                     />
                                 </div>
                             ))}

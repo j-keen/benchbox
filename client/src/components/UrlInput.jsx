@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { parseUrlApi } from '../utils/api';
 import { getPlatformIcon, getPlatformColor, getPlatformName } from '../utils/platformIcons';
+import StarRating from './StarRating';
+import CategoryButtons from './CategoryButtons';
 
 const UrlInput = ({ onSave, onPreview, currentChannelId = null, channels = [] }) => {
     const [url, setUrl] = useState('');
@@ -9,6 +11,8 @@ const UrlInput = ({ onSave, onPreview, currentChannelId = null, channels = [] })
     const [error, setError] = useState('');
     const [showLocationPicker, setShowLocationPicker] = useState(false);
     const [selectedChannelId, setSelectedChannelId] = useState(currentChannelId);
+    const [categories, setCategories] = useState([]);
+    const [rating, setRating] = useState(3);
 
     const handlePaste = async (e) => {
         const pastedUrl = e.clipboardData?.getData('text') || e.target.value;
@@ -46,13 +50,17 @@ const UrlInput = ({ onSave, onPreview, currentChannelId = null, channels = [] })
         }
     };
 
+    const canSave = preview && (preview.type === 'channel' || categories.length > 0);
+
     const handleSave = () => {
-        if (!preview) return;
+        if (!canSave) return;
 
         onSave({
             url: preview.original_url,
             channel_id: preview.type === 'channel' ? null : selectedChannelId,
             isChannel: preview.type === 'channel',
+            categories,
+            rating,
             ...preview
         });
 
@@ -61,6 +69,8 @@ const UrlInput = ({ onSave, onPreview, currentChannelId = null, channels = [] })
         setPreview(null);
         setError('');
         setShowLocationPicker(false);
+        setCategories([]);
+        setRating(3);
     };
 
     const handleCancel = () => {
@@ -165,6 +175,29 @@ const UrlInput = ({ onSave, onPreview, currentChannelId = null, channels = [] })
                             </div>
                         </div>
 
+                        {/* 카테고리 + 별점 (영상일 때만) */}
+                        {preview.type !== 'channel' && (
+                            <div className="mt-3 space-y-2">
+                                <div>
+                                    <label className="text-xs font-medium text-gray-500 mb-1 block">
+                                        카테고리 <span className="text-red-400">*</span>
+                                    </label>
+                                    <CategoryButtons
+                                        selected={categories}
+                                        onChange={setCategories}
+                                        required={false}
+                                    />
+                                    {categories.length === 0 && (
+                                        <p className="mt-1 text-[10px] text-red-400">최소 1개 카테고리를 선택해주세요</p>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-500 mb-1 block">별점</label>
+                                    <StarRating rating={rating} onChange={setRating} size="sm" />
+                                </div>
+                            </div>
+                        )}
+
                         {/* 버튼 */}
                         <div className="mt-4 flex justify-end gap-2">
                             {preview.type !== 'channel' && channels.length > 0 && (
@@ -183,7 +216,8 @@ const UrlInput = ({ onSave, onPreview, currentChannelId = null, channels = [] })
                             </button>
                             <button
                                 onClick={handleSave}
-                                className="px-4 py-1.5 text-sm text-white bg-primary-500 hover:bg-primary-600 rounded transition-colors"
+                                disabled={!canSave}
+                                className="px-4 py-1.5 text-sm text-white bg-primary-500 hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed rounded transition-colors"
                             >
                                 {preview.type === 'channel' ? '등록' : '저장'}
                             </button>

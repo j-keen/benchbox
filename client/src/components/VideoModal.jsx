@@ -2,12 +2,17 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { videosApi, aiAssistApi, youtubeCommentsApi, savedCommentsApi } from '../utils/api';
 import { getPlatformIcon, getPlatformColor, getPlatformName } from '../utils/platformIcons';
 import TagInput from './TagInput';
+import StarRating from './StarRating';
+import CategoryButtons from './CategoryButtons';
 import useModalHistory from '../hooks/useModalHistory';
 
 const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
     useModalHistory(!!video, onClose);
     const [memo, setMemo] = useState(video?.memo || '');
     const [tags, setTags] = useState(video?.tags || []);
+    const [categories, setCategories] = useState(video?.categories || []);
+    const [rating, setRating] = useState(video?.rating || 3);
+    const [downloadCheck, setDownloadCheck] = useState(video?.download_check || false);
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -39,13 +44,16 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
 
     // 디바운스 저장
     const debouncedSave = useCallback(
-        debounce(async (newMemo, newTags) => {
+        debounce(async (newMemo, newTags, newCategories, newRating, newDownloadCheck) => {
             if (!video) return;
             setSaving(true);
             try {
                 const response = await videosApi.update(video.id, {
                     memo: newMemo,
-                    tags: newTags
+                    tags: newTags,
+                    categories: newCategories,
+                    rating: newRating,
+                    download_check: newDownloadCheck
                 });
                 onUpdate(response.data);
             } catch (error) {
@@ -58,10 +66,16 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
     );
 
     useEffect(() => {
-        if (video && (memo !== video.memo || JSON.stringify(tags) !== JSON.stringify(video.tags))) {
-            debouncedSave(memo, tags);
+        if (video && (
+            memo !== video.memo ||
+            JSON.stringify(tags) !== JSON.stringify(video.tags) ||
+            JSON.stringify(categories) !== JSON.stringify(video.categories) ||
+            rating !== video.rating ||
+            downloadCheck !== video.download_check
+        )) {
+            debouncedSave(memo, tags, categories, rating, downloadCheck);
         }
-    }, [memo, tags]);
+    }, [memo, tags, categories, rating, downloadCheck]);
 
     // 모달 열릴 때 저장 댓글 로드
     useEffect(() => {
@@ -438,6 +452,39 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                                     {video.description}
                                 </p>
                             )}
+
+                            {/* 카테고리 */}
+                            <div className="mt-2 sm:mt-3">
+                                <label className="text-xs font-medium text-gray-500 mb-1 block">카테고리</label>
+                                <CategoryButtons
+                                    selected={categories}
+                                    onChange={setCategories}
+                                    required={true}
+                                />
+                            </div>
+
+                            {/* 별점 + 다운로드 체크 */}
+                            <div className="mt-2 sm:mt-3 flex items-center justify-between">
+                                <div>
+                                    <label className="text-xs font-medium text-gray-500 mb-1 block">별점</label>
+                                    <StarRating rating={rating} onChange={setRating} size="sm" />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setDownloadCheck(!downloadCheck)}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-colors ${
+                                        downloadCheck
+                                            ? 'bg-green-100 text-green-700 border border-green-300'
+                                            : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
+                                    }`}
+                                    title={downloadCheck ? '다운로드 체크 해제' : '다운로드 체크'}
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    {downloadCheck ? '다운로드' : '다운로드'}
+                                </button>
+                            </div>
 
                             {/* 메모 */}
                             <div className="mt-2 sm:mt-3 flex-1 flex flex-col">

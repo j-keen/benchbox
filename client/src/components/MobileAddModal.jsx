@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import TagInput from './TagInput';
 import SaveLocationPicker from './SaveLocationPicker';
+import StarRating from './StarRating';
+import CategoryButtons from './CategoryButtons';
 import { getPlatformIcon, getPlatformColor, getPlatformName } from '../utils/platformIcons';
 import { aiAssistApi } from '../utils/api';
 import useModalHistory from '../hooks/useModalHistory';
@@ -8,23 +9,26 @@ import useModalHistory from '../hooks/useModalHistory';
 export default function MobileAddModal({ preview, channels, folders = [], currentChannelId, onSave, onClose, onChannelsChange, onFoldersChange }) {
   useModalHistory(true, onClose);
   const [memo, setMemo] = useState('');
-  const [tags, setTags] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [rating, setRating] = useState(3);
   const [selectedChannelId, setSelectedChannelId] = useState(currentChannelId || null);
   const [selectedFolderId, setSelectedFolderId] = useState(null);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [aiMemoLoading, setAiMemoLoading] = useState(false);
-  const [aiTagsLoading, setAiTagsLoading] = useState(false);
-  const [suggestedTags, setSuggestedTags] = useState([]);
   const [originalMemo, setOriginalMemo] = useState(null);
 
+  const canSave = categories.length > 0;
+
   const handleSave = () => {
+    if (!canSave) return;
     onSave({
       url: preview.original_url,
       channel_id: preview.type === 'channel' ? null : selectedChannelId,
       folder_id: preview.type === 'channel' ? null : selectedFolderId,
       isChannel: preview.type === 'channel',
       memo,
-      tags,
+      categories,
+      rating,
       ...preview
     });
   };
@@ -35,7 +39,6 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
     setShowLocationPicker(false);
   };
 
-  // 선택된 위치의 표시 이름 계산
   const getLocationLabel = () => {
     if (selectedFolderId) {
       const folder = folders.find(f => f.id === selectedFolderId);
@@ -71,34 +74,6 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
         setMemo(originalMemo);
         setOriginalMemo(null);
     }
-  };
-
-  const handleAiSuggestTags = async () => {
-    setAiTagsLoading(true);
-    try {
-        const result = await aiAssistApi.suggestTags({
-            title: preview.title,
-            description: preview.description,
-            memo,
-            existingTags: tags
-        });
-        setSuggestedTags(result.suggestedTags || []);
-    } catch (error) {
-        console.error('AI 태그 추천 오류:', error);
-    } finally {
-        setAiTagsLoading(false);
-    }
-  };
-
-  const handleAcceptTag = (tag) => {
-    if (!tags.includes(tag)) {
-        setTags(prev => [...prev, tag]);
-    }
-    setSuggestedTags(prev => prev.filter(t => t !== tag));
-  };
-
-  const handleDismissSuggestions = () => {
-    setSuggestedTags([]);
   };
 
   const PlatformIcon = getPlatformIcon(preview.platform);
@@ -153,6 +128,27 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
 
         {/* Scrollable Content */}
         <div className="overflow-y-auto flex-1 p-3 sm:p-4 space-y-3 sm:space-y-4">
+          {/* 카테고리 (최상단) */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">
+              카테고리 <span className="text-red-400">*</span>
+            </label>
+            <CategoryButtons
+              selected={categories}
+              onChange={setCategories}
+              required={false}
+            />
+            {categories.length === 0 && (
+              <p className="mt-1 text-[10px] text-red-400">최소 1개 카테고리를 선택해주세요</p>
+            )}
+          </div>
+
+          {/* 별점 */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">별점</label>
+            <StarRating rating={rating} onChange={setRating} />
+          </div>
+
           {/* 썸네일 (9:16) + 메모 가로 배치 */}
           <div className="flex gap-3">
             {/* 9:16 썸네일 */}
@@ -210,56 +206,6 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
             </div>
           </div>
 
-          {/* Tags */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium text-gray-500">태그</label>
-              <button
-                onClick={handleAiSuggestTags}
-                disabled={aiTagsLoading}
-                className="text-[10px] px-1.5 py-0.5 bg-violet-50 text-violet-600 hover:bg-violet-100 disabled:opacity-40 rounded transition-colors flex items-center gap-0.5"
-              >
-                {aiTagsLoading ? (
-                  <div className="w-3 h-3 border border-violet-400 border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                )}
-                AI 추천
-              </button>
-            </div>
-            <TagInput
-              tags={tags}
-              onChange={setTags}
-            />
-            {/* AI 추천 태그 */}
-            {suggestedTags.length > 0 && (
-              <div className="mt-1.5 p-2 bg-violet-50 rounded-lg">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-violet-600 font-medium">AI 추천 태그</span>
-                  <button
-                    onClick={handleDismissSuggestions}
-                    className="text-[10px] text-violet-400 hover:text-violet-600"
-                  >
-                    닫기
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {suggestedTags.map(tag => (
-                    <button
-                      key={tag}
-                      onClick={() => handleAcceptTag(tag)}
-                      className="px-2 py-0.5 text-xs bg-white text-violet-700 border border-violet-200 hover:bg-violet-100 rounded-full transition-colors"
-                    >
-                      + {tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Save Location - 접힌 row */}
           {preview.type !== 'channel' && (
           <div>
@@ -287,7 +233,8 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
           </button>
           <button
             onClick={handleSave}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors min-h-[44px]"
+            disabled={!canSave}
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors min-h-[44px]"
           >
             저장
           </button>

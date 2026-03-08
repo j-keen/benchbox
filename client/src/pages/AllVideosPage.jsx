@@ -7,6 +7,8 @@ import QuickUrlModal from '../components/QuickUrlModal';
 import BatchTagModal from '../components/BatchTagModal';
 import NavigationTabs from '../components/NavigationTabs';
 import { getPlatformName } from '../utils/platformIcons';
+import { CATEGORIES } from '../utils/categories';
+import { exportCheckedVideosAsMarkdown, downloadMarkdownFile } from '../utils/exportMarkdown';
 
 const AllVideosPage = () => {
     const toast = useToast();
@@ -21,6 +23,7 @@ const AllVideosPage = () => {
     const [filterPlatform, setFilterPlatform] = useState('all');
     const [filterVideoType, setFilterVideoType] = useState('all');
     const [filterTag, setFilterTag] = useState('');
+    const [filterCategory, setFilterCategory] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
 
     // 모달 상태
@@ -31,9 +34,12 @@ const AllVideosPage = () => {
     const [selectedVideos, setSelectedVideos] = useState(new Set());
     const selectionMode = selectedVideos.size > 0;
 
+    // 다운로드 체크된 영상 수
+    const checkedCount = videos.filter(v => v.download_check).length;
+
     useEffect(() => {
         loadData();
-    }, [sortBy, filterPlatform, filterVideoType, filterTag, searchQuery]);
+    }, [sortBy, filterPlatform, filterVideoType, filterTag, filterCategory, searchQuery]);
 
     const loadData = async () => {
         try {
@@ -41,10 +47,10 @@ const AllVideosPage = () => {
             const params = {
                 sort: sortBy,
             };
-            // 전체 영상 보기 - channel_id 필터 없음
             if (filterPlatform !== 'all') params.platform = filterPlatform;
             if (filterVideoType !== 'all') params.video_type = filterVideoType;
             if (filterTag) params.tag = filterTag;
+            if (filterCategory !== 'all') params.category = filterCategory;
             if (searchQuery) params.search = searchQuery;
 
             const [videosRes, tagsRes, foldersRes] = await Promise.all([
@@ -137,7 +143,6 @@ const AllVideosPage = () => {
         }
     };
 
-    // 선택한 영상을 폴더로 이동
     const handleMoveToFolder = async (folderId) => {
         if (selectedVideos.size === 0) return;
 
@@ -152,6 +157,26 @@ const AllVideosPage = () => {
         }
     };
 
+    const handleToggleDownloadCheck = async (videoId, checked) => {
+        try {
+            await videosApi.update(videoId, { download_check: checked });
+            setVideos(prev => prev.map(v => v.id === videoId ? { ...v, download_check: checked } : v));
+        } catch (error) {
+            console.error('다운로드 체크 오류:', error);
+        }
+    };
+
+    const handleExportChecked = () => {
+        const checkedVideos = videos.filter(v => v.download_check);
+        if (checkedVideos.length === 0) {
+            toast.error('다운로드 체크된 영상이 없습니다.');
+            return;
+        }
+        const md = exportCheckedVideosAsMarkdown(checkedVideos);
+        downloadMarkdownFile(md, `benchbox-download-${new Date().toISOString().slice(0, 10)}.md`);
+        toast.success(`${checkedVideos.length}개 영상 목록을 내보냈습니다.`);
+    };
+
     return (
         <div className="min-h-screen bg-gray-50">
             {/* 네비게이션 탭 */}
@@ -164,6 +189,17 @@ const AllVideosPage = () => {
                         <div className="flex items-center gap-2 sm:gap-4">
                             <h1 className="text-xl font-bold text-gray-900">전체 영상</h1>
                             <span className="text-xs sm:text-sm text-gray-500">{videos.length}개</span>
+                            {checkedCount > 0 && (
+                                <button
+                                    onClick={handleExportChecked}
+                                    className="flex items-center gap-1 px-2.5 py-1 text-xs bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded-lg transition-colors"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    내보내기 ({checkedCount})
+                                </button>
+                            )}
                         </div>
 
                         {/* 영상 추가 버튼 + 검색창 */}
@@ -202,6 +238,7 @@ const AllVideosPage = () => {
                             <option value="newest">최신순</option>
                             <option value="oldest">오래된순</option>
                             <option value="title">제목순</option>
+                            <option value="rating_desc">별점 높은순</option>
                         </select>
 
                         <select
@@ -223,6 +260,17 @@ const AllVideosPage = () => {
                             <option value="youtube">{getPlatformName('youtube')}</option>
                             <option value="tiktok">{getPlatformName('tiktok')}</option>
                             <option value="instagram">{getPlatformName('instagram')}</option>
+                        </select>
+
+                        <select
+                            value={filterCategory}
+                            onChange={(e) => setFilterCategory(e.target.value)}
+                            className="text-sm border border-gray-200 rounded-lg px-3 py-2 sm:py-1.5 min-h-[44px] sm:min-h-0"
+                        >
+                            <option value="all">전체 카테고리</option>
+                            {CATEGORIES.map(cat => (
+                                <option key={cat.id} value={cat.id}>{cat.emoji} {cat.label}</option>
+                            ))}
                         </select>
 
                         {tags.length > 0 && (
@@ -321,6 +369,7 @@ const AllVideosPage = () => {
                                     isSelected={selectedVideos.has(video.id)}
                                     onSelect={handleVideoSelect}
                                     selectionMode={selectionMode}
+                                    onToggleDownloadCheck={handleToggleDownloadCheck}
                                 />
                             </div>
                         ))}

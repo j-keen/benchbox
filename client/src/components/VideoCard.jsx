@@ -1,8 +1,10 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { getPlatformIcon, getPlatformColor } from '../utils/platformIcons';
 import HighlightText from './HighlightText';
+import StarRating from './StarRating';
+import { CATEGORIES } from '../utils/categories';
 
-const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, draggable = true, searchQuery }) => {
+const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, draggable = true, searchQuery, onToggleDownloadCheck }) => {
     const [isHovered, setIsHovered] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const PlatformIcon = getPlatformIcon(video.platform);
@@ -186,6 +188,26 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
                         <PlatformIcon className="w-4 h-4" />
                     </div>
                 </div>
+
+                {/* 좌측 하단: 다운로드 체크 */}
+                {onToggleDownloadCheck && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleDownloadCheck(video.id, !video.download_check);
+                        }}
+                        className={`absolute bottom-2 left-2 p-1 rounded transition-colors ${
+                            video.download_check
+                                ? 'bg-green-500 text-white'
+                                : 'bg-black/40 text-white/70 hover:bg-black/60'
+                        }`}
+                        title={video.download_check ? '다운로드 체크 해제' : '다운로드 체크'}
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                    </button>
+                )}
             </div>
 
             {/* 정보 */}
@@ -203,10 +225,29 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
                     </div>
                 )}
 
-                {/* 저장일 */}
-                <div className="mt-1 text-xs text-gray-400">
-                    {formatDate(video.created_at)}
+                {/* 별점 + 저장일 */}
+                <div className="mt-1 flex items-center gap-2">
+                    {video.rating > 0 && (
+                        <StarRating rating={video.rating} size="sm" readonly />
+                    )}
+                    <span className="text-xs text-gray-400">
+                        {formatDate(video.created_at)}
+                    </span>
                 </div>
+
+                {/* 카테고리 배지 */}
+                {video.categories && video.categories.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-0.5">
+                        {video.categories.map(catId => {
+                            const cat = CATEGORIES.find(c => c.id === catId);
+                            return cat ? (
+                                <span key={catId} className="text-[10px] bg-primary-50 text-primary-600 px-1 py-0.5 rounded">
+                                    {cat.emoji} {cat.label}
+                                </span>
+                            ) : null;
+                        })}
+                    </div>
+                )}
 
                 {/* 검색 매칭 스니펫 (메모/태그) */}
                 {searchQuery && (() => {

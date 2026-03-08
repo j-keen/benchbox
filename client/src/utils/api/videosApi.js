@@ -33,7 +33,15 @@ export const videosApi = {
             query = query.eq('video_type', params.video_type);
         }
 
-        // 검색은 태그 포함해서 JS에서 처리 (아래 videosWithTags에서)
+        // 카테고리 필터
+        if (params.category && params.category !== 'all') {
+            query = query.contains('categories', [params.category]);
+        }
+
+        // 다운로드 체크 필터
+        if (params.download_check === true) {
+            query = query.eq('download_check', true);
+        }
 
         switch (params.sort) {
             case 'oldest':
@@ -41,6 +49,9 @@ export const videosApi = {
                 break;
             case 'title':
                 query = query.order('title', { ascending: true });
+                break;
+            case 'rating_desc':
+                query = query.order('rating', { ascending: false }).order('created_at', { ascending: false });
                 break;
             default:
                 query = query.order('created_at', { ascending: false });
@@ -104,7 +115,7 @@ export const videosApi = {
     },
 
     create: async (data) => {
-        const { url, channel_id = null, folder_id = null, memo = '', tags = [], title, thumbnail, description } = data;
+        const { url, channel_id = null, folder_id = null, memo = '', tags = [], title, thumbnail, description, categories = [], rating = 3 } = data;
         const urlInfo = analyzeUrl(url);
 
         // 중복 체크 (에러 발생시 무시하고 진행)
@@ -134,7 +145,9 @@ export const videosApi = {
                 title: title || url,
                 thumbnail: thumbnail || null,
                 description: description || null,
-                memo
+                memo,
+                categories,
+                rating
             })
             .select()
             .single();
@@ -148,11 +161,14 @@ export const videosApi = {
     },
 
     update: async (id, data) => {
-        const { memo, tags, channel_id, folder_id } = data;
+        const { memo, tags, channel_id, folder_id, categories, rating, download_check } = data;
         const updates = { updated_at: new Date().toISOString() };
         if (memo !== undefined) updates.memo = memo;
         if (channel_id !== undefined) updates.channel_id = channel_id || null;
         if (folder_id !== undefined) updates.folder_id = folder_id || null;
+        if (categories !== undefined) updates.categories = categories;
+        if (rating !== undefined) updates.rating = rating;
+        if (download_check !== undefined) updates.download_check = download_check;
 
         await supabase.from('videos').update(updates).eq('id', id);
 
@@ -166,6 +182,21 @@ export const videosApi = {
         const updatedTags = tagData?.map(t => t.tags?.name).filter(Boolean) || [];
 
         return { data: { ...updatedVideo, tags: updatedTags } };
+    },
+
+    getChecked: async () => {
+        const { data: videos, error } = await withRetry(() =>
+            supabase.from('videos').select('*, video_tags(tags(name))').eq('download_check', true).order('created_at', { ascending: false })
+        );
+        if (error) throw error;
+
+        const videosWithTags = videos.map(video => {
+            const tags = (video.video_tags || []).map(vt => vt.tags?.name).filter(Boolean);
+            const { video_tags: _, ...videoData } = video;
+            return { ...videoData, tags };
+        });
+
+        return { data: { videos: videosWithTags } };
     },
 
     delete: async (id) => {
