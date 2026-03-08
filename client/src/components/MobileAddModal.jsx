@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import SaveLocationPicker from './SaveLocationPicker';
 import StarRating from './StarRating';
 import CategoryButtons from './CategoryButtons';
 import { getPlatformIcon, getPlatformColor, getPlatformName } from '../utils/platformIcons';
-import { aiAssistApi } from '../utils/api';
+import { aiAssistApi, youtubeCommentsApi } from '../utils/api';
 import useModalHistory from '../hooks/useModalHistory';
 
 export default function MobileAddModal({ preview, channels, folders = [], currentChannelId, onSave, onClose, onChannelsChange, onFoldersChange }) {
@@ -17,6 +17,24 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
   const [aiMemoLoading, setAiMemoLoading] = useState(false);
   const [originalMemo, setOriginalMemo] = useState(null);
 
+  // YouTube 인기 댓글
+  const [comments, setComments] = useState([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsDisabled, setCommentsDisabled] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+
+  // 북마크 (로컬 — 아직 DB 저장 전)
+  const [bookmarkedComments, setBookmarkedComments] = useState([]);
+  // 각 항목: { author, text, likeCount, publishedAt, memo }
+
+  // 메모 팝업
+  const [memoPopup, setMemoPopup] = useState(null);
+  const [memoPopupValue, setMemoPopupValue] = useState('');
+
+  // 롱프레스
+  const pressTimer = useRef(null);
+  const isLongPress = useRef(false);
+
   const canSave = categories.length > 0;
 
   const handleSave = () => {
@@ -29,8 +47,104 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
       memo,
       categories,
       rating,
+      bookmarkedComments,
       ...preview
     });
+  };
+
+  // 댓글 로드
+  const handleLoadComments = async () => {
+    if (comments.length > 0 || commentsDisabled) {
+      setShowComments(!showComments);
+      return;
+    }
+    setCommentsLoading(true);
+    setShowComments(true);
+    try {
+      const result = await youtubeCommentsApi.getComments(preview.original_url);
+      setComments(result.comments || []);
+      setCommentsDisabled(result.disabled || false);
+    } catch (error) {
+      console.error('댓글 로드 오류:', error);
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  // 댓글이 북마크되었는지 확인 (로컬)
+  const isCommentBookmarked = (comment) => {
+    return bookmarkedComments.some(bc => bc.author === comment.author && bc.text === comment.text);
+  };
+
+  // 북마크된 댓글의 메모 가져오기
+  const getBookmarkedComment = (comment) => {
+    return bookmarkedComments.find(bc => bc.author === comment.author && bc.text === comment.text);
+  };
+
+  // 롱프레스: 포인터 다운
+  const handleBookmarkPointerDown = (comment, idx) => {
+    isLongPress.current = false;
+    pressTimer.current = setTimeout(() => {
+      isLongPress.current = true;
+      openMemoPopup(comment, idx);
+    }, 400);
+  };
+
+  // 롱프레스: 포인터 업 (짧은 탭)
+  const handleBookmarkPointerUp = (comment, idx) => {
+    clearTimeout(pressTimer.current);
+    if (isLongPress.current) return;
+    if (isCommentBookmarked(comment)) {
+      // 북마크 해제
+      setBookmarkedComments(prev => prev.filter(bc => !(bc.author === comment.author && bc.text === comment.text)));
+    } else {
+      // 북마크 추가 (메모 없이)
+      setBookmarkedComments(prev => [...prev, {
+        author: comment.author,
+        text: comment.text,
+        likeCount: comment.likeCount || 0,
+        publishedAt: comment.publishedAt || null,
+        memo: '',
+      }]);
+    }
+  };
+
+  // 롱프레스: 포인터 떠남
+  const handleBookmarkPointerLeave = () => {
+    clearTimeout(pressTimer.current);
+  };
+
+  // 메모 팝업 열기
+  const openMemoPopup = (comment, idx) => {
+    const bookmarked = getBookmarkedComment(comment);
+    setMemoPopup({ comment, idx });
+    setMemoPopupValue(bookmarked?.memo || '');
+  };
+
+  // 메모 팝업 저장
+  const handleMemoPopupSave = () => {
+    if (!memoPopup) return;
+    const { comment } = memoPopup;
+    const existing = isCommentBookmarked(comment);
+    if (existing) {
+      // 메모 수정
+      setBookmarkedComments(prev => prev.map(bc =>
+        bc.author === comment.author && bc.text === comment.text
+          ? { ...bc, memo: memoPopupValue }
+          : bc
+      ));
+    } else {
+      // 새로 북마크 + 메모
+      setBookmarkedComments(prev => [...prev, {
+        author: comment.author,
+        text: comment.text,
+        likeCount: comment.likeCount || 0,
+        publishedAt: comment.publishedAt || null,
+        memo: memoPopupValue,
+      }]);
+    }
+    setMemoPopup(null);
+    setMemoPopupValue('');
   };
 
   const handleLocationSelect = ({ channelId, folderId }) => {
@@ -218,6 +332,97 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
             </button>
           </div>
           )}
+
+          {/* 인기 댓글 (YouTube만) */}
+          {preview.platform === 'youtube' && (
+            <div>
+              <button
+                onClick={handleLoadComments}
+                className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200"
+              >
+                <span className="flex items-center gap-1.5">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  인기 댓글
+                  {bookmarkedComments.length > 0 && (
+                    <span className="text-[10px] text-amber-500 font-medium">({bookmarkedComments.length}개 북마크)</span>
+                  )}
+                </span>
+                <svg className={`w-4 h-4 transition-transform ${showComments ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {showComments && (
+                <div className="mt-2 space-y-2">
+                  {commentsLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  ) : commentsDisabled ? (
+                    <p className="text-xs text-gray-400 text-center py-3">이 영상은 댓글이 비활성화되어 있습니다.</p>
+                  ) : comments.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-3">댓글이 없습니다.</p>
+                  ) : (
+                    comments.map((comment, idx) => (
+                      <div key={idx} className="px-3 py-2 bg-gray-50 rounded-lg">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium text-gray-700">{comment.author}</span>
+                          <div className="flex items-center gap-1.5">
+                            {comment.likeCount > 0 && (
+                              <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                                </svg>
+                                {comment.likeCount}
+                              </span>
+                            )}
+                            <button
+                              onPointerDown={() => handleBookmarkPointerDown(comment, idx)}
+                              onPointerUp={() => handleBookmarkPointerUp(comment, idx)}
+                              onPointerLeave={handleBookmarkPointerLeave}
+                              onContextMenu={(e) => e.preventDefault()}
+                              className="p-0.5 transition-colors select-none touch-none"
+                              title={isCommentBookmarked(comment) ? '탭: 북마크 해제 / 길게 누르기: 메모' : '탭: 북마크 / 길게 누르기: 메모와 함께 북마크'}
+                            >
+                              {isCommentBookmarked(comment) ? (
+                                <svg className="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
+                                </svg>
+                              ) : (
+                                <svg className="w-3.5 h-3.5 text-gray-400 hover:text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                                </svg>
+                              )}
+                            </button>
+                            {/* 데스크탑 메모 아이콘 - 북마크된 댓글에만 */}
+                            {isCommentBookmarked(comment) && (
+                              <button
+                                onClick={() => openMemoPopup(comment, idx)}
+                                className="hidden sm:inline-flex p-0.5 text-gray-400 hover:text-amber-500 transition-colors"
+                                title="메모 편집"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-600 whitespace-pre-wrap line-clamp-4">{comment.text}</p>
+                        {/* 북마크된 메모 표시 */}
+                        {isCommentBookmarked(comment) && getBookmarkedComment(comment)?.memo && (
+                          <div className="mt-1 px-2 py-1 bg-amber-50 rounded text-[10px] text-amber-700">
+                            {getBookmarkedComment(comment).memo}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -237,6 +442,42 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
           </button>
         </div>
       </div>
+
+      {/* 메모 팝업 모달 */}
+      {memoPopup && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={() => setMemoPopup(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-[90vw] max-w-md p-4 mx-4" onClick={e => e.stopPropagation()}>
+            {/* 댓글 미리보기 */}
+            <div className="mb-3 px-3 py-2 bg-gray-50 rounded-lg">
+              <span className="text-xs font-medium text-gray-700">{memoPopup.comment.author}</span>
+              <p className="text-xs text-gray-600 mt-1 line-clamp-3 whitespace-pre-wrap">{memoPopup.comment.text}</p>
+            </div>
+            {/* 메모 입력 */}
+            <textarea
+              value={memoPopupValue}
+              onChange={(e) => setMemoPopupValue(e.target.value)}
+              placeholder="메모를 남겨보세요..."
+              className="w-full min-h-[80px] p-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none"
+              autoFocus
+            />
+            {/* 버튼 */}
+            <div className="flex justify-end gap-2 mt-3">
+              <button
+                onClick={() => setMemoPopup(null)}
+                className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleMemoPopupSave}
+                className="px-3 py-1.5 text-xs bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+              >
+                {isCommentBookmarked(memoPopup.comment) ? '메모 수정' : '메모와 함께 북마크'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SaveLocationPicker 서브 모달 */}
       {showLocationPicker && (

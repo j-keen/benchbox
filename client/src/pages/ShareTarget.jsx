@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { parseUrlApi, videosApi, channelsApi, foldersApi } from '../utils/api';
+import { parseUrlApi, videosApi, channelsApi, foldersApi, savedCommentsApi } from '../utils/api';
 import { useToast } from '../contexts/ToastContext';
 import MobileAddModal from '../components/MobileAddModal';
 
@@ -79,7 +79,20 @@ export default function ShareTarget() {
         await channelsApi.create(data);
         addToast('채널이 저장되었습니다!', 'success');
       } else {
-        await videosApi.create(data);
+        const response = await videosApi.create(data);
+        // 북마크된 댓글 저장
+        if (data.bookmarkedComments?.length > 0) {
+          await Promise.all(data.bookmarkedComments.map(c =>
+            savedCommentsApi.create({
+              video_id: response.data.id,
+              author: c.author,
+              text: c.text,
+              like_count: c.likeCount || 0,
+              published_at: c.publishedAt || null,
+              memo: c.memo || '',
+            })
+          ));
+        }
         addToast('영상이 저장되었습니다!', 'success');
       }
       window.location.replace('/');

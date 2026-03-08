@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { videosApi, channelsApi, tagsApi, foldersApi, parseUrlApi } from '../utils/api';
+import { videosApi, channelsApi, tagsApi, foldersApi, parseUrlApi, savedCommentsApi } from '../utils/api';
 import { useToast } from '../contexts/ToastContext';
 import { useKeyboardShortcuts, useGlobalPaste } from '../hooks/useKeyboardShortcuts';
 import VideoCard from '../components/VideoCard';
@@ -245,6 +245,19 @@ const Home = () => {
                 if (data.categories) createData.categories = data.categories;
                 if (data.rating !== undefined) createData.rating = data.rating;
                 const response = await videosApi.create(createData);
+                // 북마크된 댓글 저장
+                if (data.bookmarkedComments?.length > 0) {
+                    await Promise.all(data.bookmarkedComments.map(c =>
+                        savedCommentsApi.create({
+                            video_id: response.data.id,
+                            author: c.author,
+                            text: c.text,
+                            like_count: c.likeCount || 0,
+                            published_at: c.publishedAt || null,
+                            memo: c.memo || '',
+                        })
+                    ));
+                }
                 if (!data.channel_id) {
                     setVideos(prev => [response.data, ...prev]);
                 }
