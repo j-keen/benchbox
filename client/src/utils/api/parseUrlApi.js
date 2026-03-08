@@ -33,7 +33,7 @@ export const parseUrlApi = {
                         videoType: urlInfo.videoType,
                         url: urlInfo.url,
                         title: url,
-                        thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+                        thumbnail: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
                         description: ''
                     }
                 };

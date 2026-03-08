@@ -2,7 +2,7 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 
 // YouTube API 키
-const YOUTUBE_API_KEY = 'AIzaSyBP72SA8upFcS5Buykjn5oSfvfWnvDosAw';
+const YOUTUBE_API_KEY = process.env.GOOGLE_API_KEY;
 
 // 숫자 포맷팅 (1000 -> 1K, 1000000 -> 1M)
 function formatCount(num) {
@@ -143,7 +143,10 @@ async function fetchYouTubeVideoInfo(videoId) {
 
             return {
                 title: snippet.title,
-                thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+                thumbnail: snippet.thumbnails?.maxres?.url
+                    || snippet.thumbnails?.high?.url
+                    || snippet.thumbnails?.medium?.url
+                    || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
                 description: descParts.join(' · '),
                 author: snippet.channelTitle
             };
@@ -208,7 +211,7 @@ async function fetchOgTags(url, platform, type) {
                 }
 
                 // API 실패 시 OG 태그 폴백
-                const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+                const thumbnail = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
                 try {
                     const response = await axios.get(url, {
                         headers: {
