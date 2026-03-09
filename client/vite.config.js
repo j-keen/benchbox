@@ -10,6 +10,8 @@ export default defineConfig({
       workbox: {
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
+        skipWaiting: true,
+        clientsClaim: true,
       },
       manifest: {
         name: 'BenchBox - 벤치마킹 자료 관리',

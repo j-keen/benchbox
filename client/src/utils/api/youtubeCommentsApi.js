@@ -15,7 +15,12 @@ export const youtubeCommentsApi = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ videoId })
             });
-            if (response.ok) return response.json();
+            if (response.ok) {
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return await response.json();
+                }
+            }
         } catch (e) {
             console.log('서버 API 실패, 클라이언트 폴백:', e.message);
         }
