@@ -56,7 +56,7 @@ const UrlInput = ({ onSave, onPreview, currentChannelId = null, channels = [] })
         if (!canSave) return;
 
         onSave({
-            url: preview.original_url,
+            url: preview.original_url || preview.url,
             channel_id: preview.type === 'channel' ? null : selectedChannelId,
             isChannel: preview.type === 'channel',
             categories,

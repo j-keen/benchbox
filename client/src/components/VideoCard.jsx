@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { getPlatformIcon, getPlatformColor } from '../utils/platformIcons';
 import HighlightText from './HighlightText';
-import StarRating from './StarRating';
 import { CATEGORIES } from '../utils/categories';
 
 const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, draggable = true, searchQuery, onToggleDownloadCheck }) => {
@@ -225,11 +224,8 @@ const VideoCard = ({ video, onClick, isSelected, onSelect, selectionMode, dragga
                     </div>
                 )}
 
-                {/* 별점 + 저장일 */}
-                <div className="mt-1 flex items-center gap-2">
-                    {video.rating > 0 && (
-                        <StarRating rating={video.rating} size="sm" readonly />
-                    )}
+                {/* 저장일 */}
+                <div className="mt-1">
                     <span className="text-xs text-gray-400">
                         {formatDate(video.created_at)}
                     </span>

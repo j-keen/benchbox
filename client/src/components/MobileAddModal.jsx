@@ -40,7 +40,7 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
   const handleSave = () => {
     if (!canSave) return;
     onSave({
-      url: preview.original_url,
+      url: preview.original_url || preview.url,
       channel_id: preview.type === 'channel' ? null : selectedChannelId,
       folder_id: preview.type === 'channel' ? null : selectedFolderId,
       isChannel: preview.type === 'channel',
@@ -61,9 +61,14 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
     setCommentsLoading(true);
     setShowComments(true);
     try {
-      const result = await youtubeCommentsApi.getComments(preview.original_url);
-      setComments(result.comments || []);
-      setCommentsDisabled(result.disabled || false);
+      const result = await youtubeCommentsApi.getComments(preview.original_url || preview.url);
+      if (result.error === 'API_KEY_MISSING') {
+        alert('YouTube 댓글을 불러오려면 설정에서 Google API 키를 등록해주세요.');
+        setShowComments(false);
+      } else {
+        setComments(result.comments || []);
+        setCommentsDisabled(result.disabled || false);
+      }
     } catch (error) {
       console.error('댓글 로드 오류:', error);
     } finally {
@@ -170,23 +175,23 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
     setAiMemoLoading(true);
     setOriginalMemo(memo);
     try {
-        const result = await aiAssistApi.refineMemo({
-            title: preview.title,
-            description: preview.description,
-            memo
-        });
-        setMemo(result.refinedMemo);
+      const result = await aiAssistApi.refineMemo({
+        title: preview.title,
+        description: preview.description,
+        memo
+      });
+      setMemo(result.refinedMemo);
     } catch (error) {
-        console.error('AI 메모 다듬기 오류:', error);
+      console.error('AI 메모 다듬기 오류:', error);
     } finally {
-        setAiMemoLoading(false);
+      setAiMemoLoading(false);
     }
   };
 
   const handleRevertMemo = () => {
     if (originalMemo !== null) {
-        setMemo(originalMemo);
-        setOriginalMemo(null);
+      setMemo(originalMemo);
+      setOriginalMemo(null);
     }
   };
 
@@ -319,18 +324,18 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
 
           {/* Save Location - 접힌 row */}
           {preview.type !== 'channel' && (
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">저장 위치</label>
-            <button
-              onClick={() => setShowLocationPicker(true)}
-              className="w-full flex items-center justify-between p-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-left"
-            >
-              <span className="text-sm text-gray-900 truncate">{getLocationLabel()}</span>
-              <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">저장 위치</label>
+              <button
+                onClick={() => setShowLocationPicker(true)}
+                className="w-full flex items-center justify-between p-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-left"
+              >
+                <span className="text-sm text-gray-900 truncate">{getLocationLabel()}</span>
+                <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
           )}
 
           {/* 인기 댓글 (YouTube만) */}

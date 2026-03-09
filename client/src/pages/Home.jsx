@@ -12,12 +12,14 @@ import QuickUrlModal from '../components/QuickUrlModal';
 import MobileAddModal from '../components/MobileAddModal';
 import TagManagerModal from '../components/TagManagerModal';
 import FABMenu from '../components/FABMenu';
+import FilterPanel from '../components/FilterPanel';
 import ApiKeySettingsModal from '../components/ApiKeySettingsModal';
 import { VideoGridSkeleton } from '../components/Skeleton';
+import { getPlatformName } from '../utils/platformIcons';
+import { CATEGORIES } from '../utils/categories';
 
 const Home = () => {
     const navigate = useNavigate();
-    const searchInputRef = useRef(null);
     const foldersCache = useRef(null);
     const tagsCache = useRef(null);
     const toast = useToast();
@@ -68,29 +70,30 @@ const Home = () => {
     const [sortBy, setSortBy] = useState('newest');
     const [searchQuery, setSearchQuery] = useState('');
     const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
-    const [durationFilter, setDurationFilter] = useState('all'); // 'all' | 'short' | 'long'
+    const [filterPlatform, setFilterPlatform] = useState('all');
+    const [filterVideoType, setFilterVideoType] = useState('all');
+    const [filterCategory, setFilterCategory] = useState('all');
+    const [filterTag, setFilterTag] = useState('');
+    const [filterRating, setFilterRating] = useState(null);
 
-    // 숏폼/롱폼 판별 (URL 기반)
-    const isShortForm = (video) => {
-        const url = video.url || '';
-        // 인스타그램, 틱톡 = 항상 숏폼
-        if (url.includes('instagram.com') || url.includes('tiktok.com')) return true;
-        // 유튜브 Shorts
-        if (url.includes('/shorts/')) return true;
-        return false;
+    // 필터 활성 여부
+    const hasActiveFilters = filterPlatform !== 'all' || filterVideoType !== 'all' ||
+        filterCategory !== 'all' || filterTag !== '' || filterRating !== null || searchQuery !== '';
+
+    const handleClearAllFilters = () => {
+        setSortBy('newest');
+        setFilterPlatform('all');
+        setFilterVideoType('all');
+        setFilterTag('');
+        setFilterCategory('all');
+        setFilterRating(null);
+        setSearchQuery('');
     };
-
-    // 검색 디바운싱: 타이핑 중에는 쿼리를 보내지 않고, 300ms 멈추면 실행
-    const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
-    useEffect(() => {
-        const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
-        return () => clearTimeout(timer);
-    }, [searchQuery]);
 
     // 데이터 로드
     useEffect(() => {
         loadData();
-    }, [sortBy, debouncedSearch, activeFolder, activeChannel, showUnassignedOnly]);
+    }, [sortBy, searchQuery, activeFolder, activeChannel, showUnassignedOnly, filterPlatform, filterVideoType, filterCategory, filterTag, filterRating]);
 
     // 선택 모드 토글
     useEffect(() => {
@@ -153,13 +156,43 @@ const Home = () => {
                 }
 
                 // 검색 필터 (# 제거 후 비교)
-                if (debouncedSearch) {
-                    const query = debouncedSearch.replace(/^#/, '').toLowerCase();
+                if (searchQuery) {
+                    const query = searchQuery.replace(/^#/, '').toLowerCase();
                     folderVideos = folderVideos.filter(v =>
                         v.title?.toLowerCase().includes(query) ||
                         v.memo?.toLowerCase().includes(query) ||
                         v.tags?.some(t => t.toLowerCase().includes(query))
                     );
+                }
+                // 플랫폼 필터
+                if (filterPlatform !== 'all') {
+                    folderVideos = folderVideos.filter(v => {
+                        const url = v.url || '';
+                        if (filterPlatform === 'youtube') return url.includes('youtube.com') || url.includes('youtu.be');
+                        if (filterPlatform === 'tiktok') return url.includes('tiktok.com');
+                        if (filterPlatform === 'instagram') return url.includes('instagram.com');
+                        return true;
+                    });
+                }
+                // 형식 필터
+                if (filterVideoType !== 'all') {
+                    folderVideos = folderVideos.filter(v => {
+                        const url = v.url || '';
+                        const isShort = url.includes('instagram.com') || url.includes('tiktok.com') || url.includes('/shorts/');
+                        return filterVideoType === 'shorts' ? isShort : !isShort;
+                    });
+                }
+                // 카테고리 필터
+                if (filterCategory !== 'all') {
+                    folderVideos = folderVideos.filter(v => v.category === filterCategory);
+                }
+                // 태그 필터
+                if (filterTag) {
+                    folderVideos = folderVideos.filter(v => v.tags?.includes(filterTag));
+                }
+                // 별점 필터
+                if (filterRating) {
+                    folderVideos = folderVideos.filter(v => (v.rating || 0) >= filterRating);
                 }
                 // 정렬
                 if (sortBy === 'oldest') {
@@ -176,8 +209,15 @@ const Home = () => {
                 // 전체 또는 미분류: 기존 로직
                 const videoParams = {
                     sort: sortBy,
-                    search: debouncedSearch || undefined
+                    search: searchQuery || undefined
                 };
+
+                // 필터 파라미터
+                if (filterPlatform !== 'all') videoParams.platform = filterPlatform;
+                if (filterVideoType !== 'all') videoParams.video_type = filterVideoType;
+                if (filterTag) videoParams.tag = filterTag;
+                if (filterCategory !== 'all') videoParams.category = filterCategory;
+                if (filterRating) videoParams.min_rating = filterRating;
 
                 // 채널 필터
                 if (activeChannel) {
@@ -546,13 +586,13 @@ const Home = () => {
             key: 'k',
             ctrl: true,
             action: () => {
-                searchInputRef.current?.focus();
+                document.querySelector('header input[type="text"]')?.focus();
             }
         },
         {
             key: '/',
             action: () => {
-                searchInputRef.current?.focus();
+                document.querySelector('header input[type="text"]')?.focus();
             }
         },
         {
@@ -734,39 +774,89 @@ const Home = () => {
         return folder?.name || '전체';
     };
 
+    // FilterPanel용 필터 그룹 구성
+    const filterGroups = [
+        {
+            key: 'platform',
+            label: '플랫폼',
+            options: [
+                { value: 'all', label: '전체' },
+                { value: 'youtube', label: getPlatformName('youtube') },
+                { value: 'tiktok', label: getPlatformName('tiktok') },
+                { value: 'instagram', label: getPlatformName('instagram') },
+            ],
+            value: filterPlatform,
+            onChange: setFilterPlatform,
+        },
+        {
+            key: 'videoType',
+            label: '형식',
+            options: [
+                { value: 'all', label: '전체' },
+                { value: 'shorts', label: '숏폼' },
+                { value: 'long', label: '롱폼' },
+            ],
+            value: filterVideoType,
+            onChange: setFilterVideoType,
+        },
+        {
+            key: 'category',
+            label: '카테고리',
+            options: [
+                { value: 'all', label: '전체' },
+                ...CATEGORIES.map(cat => ({ value: cat.id, label: `${cat.emoji} ${cat.label}` })),
+            ],
+            value: filterCategory,
+            onChange: setFilterCategory,
+        },
+        ...(allTags.length > 0 ? [{
+            key: 'tag',
+            label: '태그',
+            options: [
+                { value: '', label: '전체' },
+                ...allTags.map(tag => ({ value: tag.name, label: `#${tag.name}` })),
+            ],
+            value: filterTag,
+            onChange: setFilterTag,
+        }] : []),
+        {
+            key: 'rating',
+            label: '별점',
+            type: 'rating-min',
+            value: filterRating,
+            onChange: setFilterRating,
+        },
+    ];
+
+    const sortGroup = {
+        label: '정렬',
+        options: [
+            { value: 'newest', label: '최신순' },
+            { value: 'oldest', label: '오래된순' },
+            { value: 'title', label: '제목순' },
+            { value: 'rating_desc', label: '별점순' },
+        ],
+        value: sortBy,
+        onChange: setSortBy,
+    };
+
     return (
         <div className="min-h-screen bg-gray-50">
             {/* 헤더 */}
             <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
                 <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-4">
-                    {/* 모바일: 한 줄에 로고 + 검색 + 태그관리 */}
-                    <div className="flex items-center gap-2">
+                    {/* 로고 */}
+                    <div className="flex items-center gap-2 mb-2">
                         <h1 className="text-lg sm:text-xl font-bold text-gray-900 flex-shrink-0">BenchBox</h1>
-                        {/* 검색창 */}
-                        <div className="relative flex-1">
-                            <input
-                                ref={searchInputRef}
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder={`검색... (Ctrl+K)`}
-                                className="w-full sm:w-64 pl-8 pr-3 py-2 sm:py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                            />
-                            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                            {searchQuery && (
-                                <button
-                                    onClick={() => setSearchQuery('')}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
-                                >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            )}
-                        </div>
                     </div>
+                    {/* 검색 + 필터 */}
+                    <FilterPanel
+                        searchQuery={searchQuery}
+                        onSearchChange={setSearchQuery}
+                        searchPlaceholder="제목, 메모, 태그 검색... (Ctrl+K)"
+                        filterGroups={filterGroups}
+                        sortGroup={sortGroup}
+                    />
 
                     {/* 데스크탑/태블릿: URL 입력 */}
                     <div className="hidden sm:block mt-4">
@@ -1457,51 +1547,16 @@ const Home = () => {
                 {/* 영상 섹션 */}
                 <section>
                     <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                                <span>
-                                    {activeChannel
-                                        ? channels.find(c => c.id === activeChannel)?.title
-                                        : showUnassignedOnly ? '미분류 영상' : '저장한 영상'}
-                                </span>
-                                <span className="text-xs sm:text-sm font-normal text-gray-500">
-                                    {videosLoading ? '...' : `${videos.length}개`}
-                                </span>
-                            </h2>
-                            {/* 숏폼/롱폼 필터 */}
-                            <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-                                <button
-                                    onClick={() => setDurationFilter('all')}
-                                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
-                                        durationFilter === 'all'
-                                            ? 'bg-white text-gray-900 shadow-sm'
-                                            : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                                >
-                                    전체
-                                </button>
-                                <button
-                                    onClick={() => setDurationFilter('short')}
-                                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
-                                        durationFilter === 'short'
-                                            ? 'bg-white text-gray-900 shadow-sm'
-                                            : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                                >
-                                    숏폼
-                                </button>
-                                <button
-                                    onClick={() => setDurationFilter('long')}
-                                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
-                                        durationFilter === 'long'
-                                            ? 'bg-white text-gray-900 shadow-sm'
-                                            : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                                >
-                                    롱폼
-                                </button>
-                            </div>
-                        </div>
+                        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                            <span>
+                                {activeChannel
+                                    ? channels.find(c => c.id === activeChannel)?.title
+                                    : showUnassignedOnly ? '미분류 영상' : '저장한 영상'}
+                            </span>
+                            <span className="text-xs sm:text-sm font-normal text-gray-500">
+                                {videosLoading ? '...' : `${videos.length}개`}
+                            </span>
+                        </h2>
                         {/* 데스크탑: 추가 버튼 */}
                         <div className="hidden sm:flex items-center gap-2">
                             <button
@@ -1529,17 +1584,11 @@ const Home = () => {
                     </div>
 
                     {/* 영상 그리드 */}
-                    {(() => {
-                        const filteredVideos = durationFilter === 'all'
-                            ? videos
-                            : durationFilter === 'short'
-                                ? videos.filter(v => isShortForm(v))
-                                : videos.filter(v => !isShortForm(v));
-                        return videosLoading ? (
-                            <VideoGridSkeleton count={10} />
-                        ) : filteredVideos.length > 0 ? (
+                    {videosLoading ? (
+                        <VideoGridSkeleton count={10} />
+                    ) : videos.length > 0 ? (
                         <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-4">
-                            {filteredVideos.map(video => (
+                            {videos.map(video => (
                                 <div key={video.id}>
                                     <VideoCard
                                         video={video}
@@ -1547,7 +1596,7 @@ const Home = () => {
                                         isSelected={selectedVideos.has(video.id)}
                                         onSelect={handleVideoSelect}
                                         selectionMode={selectionMode}
-                                        searchQuery={debouncedSearch}
+                                        searchQuery={searchQuery}
                                         onToggleDownloadCheck={handleToggleDownloadCheck}
                                     />
                                 </div>
@@ -1559,17 +1608,17 @@ const Home = () => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                             </svg>
                             <p className="text-gray-500 mb-4">
-                                {durationFilter !== 'all'
-                                    ? `${durationFilter === 'short' ? '숏폼' : '롱폼'} 영상이 없습니다`
+                                {hasActiveFilters
+                                    ? '필터 조건에 맞는 영상이 없습니다'
                                     : '저장된 영상이 없습니다'
                                 }
                             </p>
-                            {durationFilter !== 'all' ? (
+                            {hasActiveFilters ? (
                                 <button
-                                    onClick={() => setDurationFilter('all')}
+                                    onClick={handleClearAllFilters}
                                     className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
                                 >
-                                    전체 보기
+                                    필터 초기화
                                 </button>
                             ) : (
                                 <button
@@ -1583,8 +1632,7 @@ const Home = () => {
                                 </button>
                             )}
                         </div>
-                    );
-                    })()}
+                    )}
                 </section>
             </main>
 

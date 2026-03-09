@@ -29,7 +29,7 @@ export const youtubeCommentsApi = {
         const youtubeApiKey = getGoogleApiKey();
         if (!youtubeApiKey) {
             console.log('YouTube API 키가 설정되지 않았습니다.');
-            return { comments: [], disabled: false };
+            return { error: 'API_KEY_MISSING', comments: [], disabled: false };
         }
         try {
             const ytResponse = await fetch(

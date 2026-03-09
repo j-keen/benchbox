@@ -194,8 +194,13 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                 youtubeCommentsApi.getComments(video.url),
                 savedCommentsApi.getByVideoId(video.id),
             ]);
-            setComments(result.comments || []);
-            setCommentsDisabled(result.disabled || false);
+            if (result.error === 'API_KEY_MISSING') {
+                alert('YouTube 댓글을 불러오려면 설정에서 Google API 키를 등록해주세요.');
+                setShowComments(false);
+            } else {
+                setComments(result.comments || []);
+                setCommentsDisabled(result.disabled || false);
+            }
             setSavedComments(saved);
         } catch (error) {
             console.error('댓글 로드 오류:', error);
@@ -523,11 +528,10 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                                     <button
                                         type="button"
                                         onClick={() => setDownloadCheck(!downloadCheck)}
-                                        className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-colors ${
-                                            downloadCheck
+                                        className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-colors ${downloadCheck
                                                 ? 'bg-green-100 text-green-700 border border-green-300'
                                                 : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
-                                        }`}
+                                            }`}
                                         title={downloadCheck ? '다운로드 체크 해제' : '다운로드 체크'}
                                     >
                                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
