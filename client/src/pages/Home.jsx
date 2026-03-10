@@ -309,7 +309,14 @@ const Home = () => {
             setMobileAddPreview(null);
         } catch (error) {
             console.error('저장 오류:', error);
-            toast.error(error.response?.data?.error || '저장에 실패했습니다.');
+            if (error.response?.status === 409) {
+                toast.error('이미 저장된 영상입니다.');
+                setShowMobileAddModal(false);
+                setMobileAddPreview(null);
+            } else {
+                toast.error(error.response?.data?.error || '저장에 실패했습니다.');
+            }
+            throw error;
         }
     };
 

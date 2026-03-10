@@ -42,22 +42,30 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
   const pressTimer = useRef(null);
   const isLongPress = useRef(false);
 
+  const [saving, setSaving] = useState(false);
   const canSave = categories.length > 0;
 
-  const handleSave = () => {
-    if (!canSave) return;
-    onSave({
-      url: preview.original_url || preview.url,
-      channel_id: preview.type === 'channel' ? null : selectedChannelId,
-      folder_id: preview.type === 'channel' ? null : selectedFolderId,
-      isChannel: preview.type === 'channel',
-      memo,
-      categories,
-      rating,
-      bookmarkedComments,
-      tags: selectedTags,
-      ...preview
-    });
+  const handleSave = async () => {
+    if (!canSave || saving) return;
+    setSaving(true);
+    try {
+      await onSave({
+        url: preview.original_url || preview.url,
+        channel_id: preview.type === 'channel' ? null : selectedChannelId,
+        folder_id: preview.type === 'channel' ? null : selectedFolderId,
+        isChannel: preview.type === 'channel',
+        memo,
+        categories,
+        rating,
+        bookmarkedComments,
+        tags: selectedTags,
+        ...preview
+      });
+    } catch (e) {
+      // Home.jsx에서 에러 처리하므로 여기선 상태만 복구
+    } finally {
+      setSaving(false);
+    }
   };
 
   // 댓글 로드
@@ -534,10 +542,10 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
           </button>
           <button
             onClick={handleSave}
-            disabled={!canSave}
+            disabled={!canSave || saving}
             className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors min-h-[44px]"
           >
-            저장
+            {saving ? '저장 중...' : '저장'}
           </button>
         </div>
       </div>
