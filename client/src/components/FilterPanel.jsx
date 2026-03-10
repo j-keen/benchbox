@@ -142,6 +142,7 @@ const FilterPanel = ({
                   options={group.options}
                   value={group.value}
                   onChange={group.onChange}
+                  maxHeight={group.maxHeight}
                 />
               )}
             </div>
@@ -181,10 +182,13 @@ const FilterPanel = ({
 };
 
 // 칩 선택 필터 그룹
-const FilterGroup = ({ label, options, value, onChange }) => (
+const FilterGroup = ({ label, options, value, onChange, maxHeight }) => (
   <div>
     <p className="text-xs font-medium text-gray-500 mb-1.5">{label}</p>
-    <div className="flex flex-wrap gap-1.5">
+    <div
+      className={`flex flex-wrap gap-1.5 ${maxHeight ? 'overflow-y-auto' : ''}`}
+      style={maxHeight ? { maxHeight } : undefined}
+    >
       {options.map(option => {
         const isSelected = option.value === value;
         return (

@@ -302,6 +302,9 @@ const Home = () => {
                     setVideos(prev => [response.data, ...prev]);
                 }
             }
+            const tagCount = data.tags?.length || 0;
+            const tagMsg = tagCount > 0 ? ` (태그 ${tagCount}개 포함)` : '';
+            toast.success(`저장되었습니다${tagMsg}`);
             setShowMobileAddModal(false);
             setMobileAddPreview(null);
         } catch (error) {
@@ -818,6 +821,7 @@ const Home = () => {
             ],
             value: filterTag,
             onChange: setFilterTag,
+            maxHeight: '120px',
         }] : []),
         {
             key: 'rating',

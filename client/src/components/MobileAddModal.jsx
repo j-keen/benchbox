@@ -21,7 +21,14 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
   const [comments, setComments] = useState([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsDisabled, setCommentsDisabled] = useState(false);
-  const [showComments, setShowComments] = useState(false);
+  const [showCommentsPopup, setShowCommentsPopup] = useState(false);
+
+  // AI 태그
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [showTagPopup, setShowTagPopup] = useState(false);
+  const [suggestedTags, setSuggestedTags] = useState([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
+  const [tagsError, setTagsError] = useState(false);
 
   // 북마크 (로컬 — 아직 DB 저장 전)
   const [bookmarkedComments, setBookmarkedComments] = useState([]);
@@ -48,6 +55,7 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
       categories,
       rating,
       bookmarkedComments,
+      tags: selectedTags,
       ...preview
     });
   };
@@ -55,16 +63,16 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
   // 댓글 로드
   const handleLoadComments = async () => {
     if (comments.length > 0 || commentsDisabled) {
-      setShowComments(!showComments);
+      setShowCommentsPopup(true);
       return;
     }
     setCommentsLoading(true);
-    setShowComments(true);
+    setShowCommentsPopup(true);
     try {
       const result = await youtubeCommentsApi.getComments(preview.original_url || preview.url);
       if (result.error === 'API_KEY_MISSING') {
         alert('YouTube 댓글을 불러오려면 설정에서 Google API 키를 등록해주세요.');
-        setShowComments(false);
+        setShowCommentsPopup(false);
       } else {
         setComments(result.comments || []);
         setCommentsDisabled(result.disabled || false);
@@ -193,6 +201,73 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
       setMemo(originalMemo);
       setOriginalMemo(null);
     }
+  };
+
+  // AI 태그 추천
+  const handleOpenTagPopup = async () => {
+    setShowTagPopup(true);
+    if (suggestedTags.length > 0) return; // 이미 로드됨
+    setTagsLoading(true);
+    setTagsError(false);
+    try {
+      const result = await aiAssistApi.suggestTags({
+        title: preview.title,
+        description: preview.description,
+        memo,
+        existingTags: selectedTags,
+      });
+      const tags = result.suggestedTags || [];
+      setSuggestedTags(tags);
+      setSelectedTags(tags); // 기본 전체 선택
+    } catch (error) {
+      console.error('AI 태그 추천 오류:', error);
+      setTagsError(true);
+    } finally {
+      setTagsLoading(false);
+    }
+  };
+
+  const handleRetryTags = async () => {
+    setTagsLoading(true);
+    setTagsError(false);
+    try {
+      const result = await aiAssistApi.suggestTags({
+        title: preview.title,
+        description: preview.description,
+        memo,
+        existingTags: selectedTags,
+      });
+      const tags = result.suggestedTags || [];
+      setSuggestedTags(tags);
+      setSelectedTags(tags);
+    } catch (error) {
+      console.error('AI 태그 재시도 오류:', error);
+      setTagsError(true);
+    } finally {
+      setTagsLoading(false);
+    }
+  };
+
+  const toggleTag = (tag) => {
+    setSelectedTags(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const toggleAllTags = () => {
+    if (selectedTags.length === suggestedTags.length) {
+      setSelectedTags([]);
+    } else {
+      setSelectedTags([...suggestedTags]);
+    }
+  };
+
+  const handleTagPopupConfirm = () => {
+    setShowTagPopup(false);
+  };
+
+  const removeTag = (tag) => {
+    setSelectedTags(prev => prev.filter(t => t !== tag));
   };
 
   const PlatformIcon = getPlatformIcon(preview.platform);
@@ -338,94 +413,67 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
             </div>
           )}
 
-          {/* 인기 댓글 (YouTube만) */}
+          {/* 인기 댓글 버튼 (YouTube만) */}
           {preview.platform === 'youtube' && (
-            <div>
-              <button
-                onClick={handleLoadComments}
-                className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200"
-              >
-                <span className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                  인기 댓글
-                  {bookmarkedComments.length > 0 && (
-                    <span className="text-[10px] text-amber-500 font-medium">({bookmarkedComments.length}개 북마크)</span>
-                  )}
-                </span>
-                <svg className={`w-4 h-4 transition-transform ${showComments ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            <button
+              onClick={handleLoadComments}
+              className="w-full flex items-center justify-between p-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-left"
+            >
+              <span className="flex items-center gap-1.5 text-sm text-gray-900">
+                <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
-              </button>
-              {showComments && (
-                <div className="mt-2 space-y-2">
-                  {commentsLoading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <div className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                  ) : commentsDisabled ? (
-                    <p className="text-xs text-gray-400 text-center py-3">이 영상은 댓글이 비활성화되어 있습니다.</p>
-                  ) : comments.length === 0 ? (
-                    <p className="text-xs text-gray-400 text-center py-3">댓글이 없습니다.</p>
-                  ) : (
-                    comments.map((comment, idx) => (
-                      <div key={idx} className="px-3 py-2 bg-gray-50 rounded-lg">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-gray-700">{comment.author}</span>
-                          <div className="flex items-center gap-1.5">
-                            {comment.likeCount > 0 && (
-                              <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
-                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                  <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                                </svg>
-                                {comment.likeCount}
-                              </span>
-                            )}
-                            <button
-                              onPointerDown={() => handleBookmarkPointerDown(comment, idx)}
-                              onPointerUp={() => handleBookmarkPointerUp(comment, idx)}
-                              onPointerLeave={handleBookmarkPointerLeave}
-                              onContextMenu={(e) => e.preventDefault()}
-                              className="p-0.5 transition-colors select-none touch-none"
-                              title={isCommentBookmarked(comment) ? '탭: 북마크 해제 / 길게 누르기: 메모' : '탭: 북마크 / 길게 누르기: 메모와 함께 북마크'}
-                            >
-                              {isCommentBookmarked(comment) ? (
-                                <svg className="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-                                  <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
-                                </svg>
-                              ) : (
-                                <svg className="w-3.5 h-3.5 text-gray-400 hover:text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                                </svg>
-                              )}
-                            </button>
-                            {/* 데스크탑 메모 아이콘 - 북마크된 댓글에만 */}
-                            {isCommentBookmarked(comment) && (
-                              <button
-                                onClick={() => openMemoPopup(comment, idx)}
-                                className="hidden sm:inline-flex p-0.5 text-gray-400 hover:text-amber-500 transition-colors"
-                                title="메모 편집"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        <p className="text-xs text-gray-600 whitespace-pre-wrap line-clamp-4">{comment.text}</p>
-                        {/* 북마크된 메모 표시 */}
-                        {isCommentBookmarked(comment) && getBookmarkedComment(comment)?.memo && (
-                          <div className="mt-1 px-2 py-1 bg-amber-50 rounded text-[10px] text-amber-700">
-                            {getBookmarkedComment(comment).memo}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
+                인기 댓글
+                {bookmarkedComments.length > 0 && (
+                  <span className="text-[10px] text-amber-500 font-medium">({bookmarkedComments.length}개 북마크)</span>
+                )}
+              </span>
+              <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
+
+          {/* AI 태그 추천 버튼 */}
+          <button
+            onClick={handleOpenTagPopup}
+            className="w-full flex items-center justify-between p-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-left"
+          >
+            <span className="flex items-center gap-1.5 text-sm text-gray-900">
+              <svg className="w-4 h-4 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+              AI 태그 추천
+              {selectedTags.length > 0 && (
+                <span className="inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-violet-500 rounded-full">
+                  {selectedTags.length}
+                </span>
               )}
+            </span>
+            <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          {/* 선택된 태그 칩 */}
+          {selectedTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {selectedTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-violet-50 text-violet-700 rounded-full"
+                >
+                  {tag}
+                  <button
+                    onClick={() => removeTag(tag)}
+                    className="text-violet-400 hover:text-violet-600"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              ))}
             </div>
           )}
         </div>
@@ -450,7 +498,7 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
 
       {/* 메모 팝업 모달 */}
       {memoPopup && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={() => setMemoPopup(null)}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onClick={() => setMemoPopup(null)}>
           <div className="bg-white rounded-xl shadow-2xl w-[90vw] max-w-md p-4 mx-4" onClick={e => e.stopPropagation()}>
             {/* 댓글 미리보기 */}
             <div className="mb-3 px-3 py-2 bg-gray-50 rounded-lg">
@@ -480,6 +528,187 @@ export default function MobileAddModal({ preview, channels, folders = [], curren
                 {isCommentBookmarked(memoPopup.comment) ? '메모 수정' : '메모와 함께 북마크'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 인기 댓글 팝업 모달 */}
+      {showCommentsPopup && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowCommentsPopup(false)}>
+          <div
+            className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-md max-h-[70vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sm:hidden flex justify-center py-2">
+              <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+            </div>
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-900">인기 댓글</h3>
+              <button onClick={() => setShowCommentsPopup(false)} className="p-1 text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {commentsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : commentsDisabled ? (
+                <p className="text-xs text-gray-400 text-center py-6">이 영상은 댓글이 비활성화되어 있습니다.</p>
+              ) : comments.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-6">댓글이 없습니다.</p>
+              ) : (
+                comments.map((comment, idx) => (
+                  <div key={idx} className="px-3 py-2 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-gray-700">{comment.author}</span>
+                      <div className="flex items-center gap-1.5">
+                        {comment.likeCount > 0 && (
+                          <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                            </svg>
+                            {comment.likeCount}
+                          </span>
+                        )}
+                        <button
+                          onPointerDown={() => handleBookmarkPointerDown(comment, idx)}
+                          onPointerUp={() => handleBookmarkPointerUp(comment, idx)}
+                          onPointerLeave={handleBookmarkPointerLeave}
+                          onContextMenu={(e) => e.preventDefault()}
+                          className="p-0.5 transition-colors select-none touch-none"
+                          title={isCommentBookmarked(comment) ? '탭: 북마크 해제 / 길게 누르기: 메모' : '탭: 북마크 / 길게 누르기: 메모와 함께 북마크'}
+                        >
+                          {isCommentBookmarked(comment) ? (
+                            <svg className="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3.5 h-3.5 text-gray-400 hover:text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                            </svg>
+                          )}
+                        </button>
+                        {isCommentBookmarked(comment) && (
+                          <button
+                            onClick={() => openMemoPopup(comment, idx)}
+                            className="hidden sm:inline-flex p-0.5 text-gray-400 hover:text-amber-500 transition-colors"
+                            title="메모 편집"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-600 whitespace-pre-wrap line-clamp-4">{comment.text}</p>
+                    {isCommentBookmarked(comment) && getBookmarkedComment(comment)?.memo && (
+                      <div className="mt-1 px-2 py-1 bg-amber-50 rounded text-[10px] text-amber-700">
+                        {getBookmarkedComment(comment).memo}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="p-3 border-t border-gray-200">
+              <button
+                onClick={() => setShowCommentsPopup(false)}
+                className="w-full px-4 py-2.5 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors min-h-[44px]"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI 태그 추천 팝업 모달 */}
+      {showTagPopup && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowTagPopup(false)}>
+          <div
+            className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-md max-h-[70vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sm:hidden flex justify-center py-2">
+              <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+            </div>
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-900">AI 태그 추천</h3>
+              <button onClick={() => setShowTagPopup(false)} className="p-1 text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {tagsLoading ? (
+                <div className="flex flex-col items-center justify-center py-8 gap-3">
+                  <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-sm text-gray-500">태그를 분석하고 있어요...</p>
+                </div>
+              ) : tagsError ? (
+                <div className="flex flex-col items-center justify-center py-8 gap-3">
+                  <p className="text-sm text-gray-500">태그 추천에 실패했습니다.</p>
+                  <button
+                    onClick={handleRetryTags}
+                    className="px-4 py-2 text-sm text-violet-600 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors"
+                  >
+                    다시 시도
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {suggestedTags.map((tag) => (
+                    <button
+                      key={tag}
+                      onClick={() => toggleTag(tag)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-full border transition-colors ${
+                        selectedTags.includes(tag)
+                          ? 'bg-violet-100 border-violet-300 text-violet-700'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {selectedTags.includes(tag) && (
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {!tagsLoading && !tagsError && suggestedTags.length > 0 && (
+              <div className="flex items-center justify-between p-3 border-t border-gray-200">
+                <button
+                  onClick={toggleAllTags}
+                  className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  {selectedTags.length === suggestedTags.length ? '전체 해제' : '전체 선택'}
+                </button>
+                <button
+                  onClick={handleTagPopupConfirm}
+                  className="px-4 py-2.5 text-sm font-medium text-white bg-violet-500 hover:bg-violet-600 rounded-lg transition-colors min-h-[44px]"
+                >
+                  선택 저장 ({selectedTags.length}개)
+                </button>
+              </div>
+            )}
+            {(tagsLoading || tagsError || suggestedTags.length === 0) && (
+              <div className="p-3 border-t border-gray-200">
+                <button
+                  onClick={() => setShowTagPopup(false)}
+                  className="w-full px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors min-h-[44px]"
+                >
+                  닫기
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
