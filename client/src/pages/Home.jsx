@@ -823,6 +823,7 @@ const Home = () => {
         ...(allTags.length > 0 ? [{
             key: 'tag',
             label: '태그',
+            hideChip: true,
             options: [
                 { value: '', label: '전체' },
                 ...allTags.map(tag => ({ value: tag.name, label: `#${tag.name}` })),

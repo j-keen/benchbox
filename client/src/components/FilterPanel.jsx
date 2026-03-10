@@ -35,6 +35,7 @@ const FilterPanel = ({
 
   // 활성 필터 개수 (정렬 제외)
   const activeFilters = filterGroups.filter(g => {
+    if (g.hideChip) return false;
     if (g.type === 'rating-min') return g.value !== null;
     return g.value !== 'all' && g.value !== '';
   });

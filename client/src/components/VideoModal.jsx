@@ -229,6 +229,9 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
     const handleQuickSave = async (comment, idx) => {
         setSavingCommentIdx(idx);
         try {
+            const minOrder = savedComments.length > 0
+                ? Math.min(...savedComments.map(sc => sc.sort_order ?? 0)) - 1
+                : 0;
             const saved = await savedCommentsApi.create({
                 video_id: video.id,
                 author: comment.author,
@@ -236,6 +239,7 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                 like_count: comment.likeCount || 0,
                 published_at: comment.publishedAt || null,
                 memo: '',
+                sort_order: minOrder,
             });
             setSavedComments(prev => [saved, ...prev]);
         } catch (error) {
@@ -258,6 +262,9 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                 setSavedComments(prev => prev.map(sc => sc.id === savedId ? { ...sc, memo: memoPopupValue } : sc));
             } else {
                 // 새로 저장 (메모 포함)
+                const minOrder = savedComments.length > 0
+                    ? Math.min(...savedComments.map(sc => sc.sort_order ?? 0)) - 1
+                    : 0;
                 const saved = await savedCommentsApi.create({
                     video_id: video.id,
                     author: comment.author,
@@ -265,6 +272,7 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                     like_count: comment.likeCount || 0,
                     published_at: comment.publishedAt || null,
                     memo: memoPopupValue,
+                    sort_order: minOrder,
                 });
                 setSavedComments(prev => [saved, ...prev]);
             }
@@ -322,6 +330,50 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
     // 롱프레스 감지: 포인터 떠남
     const handleBookmarkPointerLeave = () => {
         clearTimeout(pressTimer.current);
+    };
+
+    // 저장 댓글 순서 변경 (위/아래 swap)
+    const handleReorderComment = async (index, direction) => {
+        const targetIndex = index + direction; // direction: -1 (위), +1 (아래)
+        if (targetIndex < 0 || targetIndex >= savedComments.length) return;
+
+        const current = savedComments[index];
+        const target = savedComments[targetIndex];
+        const currentOrder = current.sort_order ?? 0;
+        const targetOrder = target.sort_order ?? 0;
+
+        // 같은 sort_order면 구분을 위해 값 조정
+        const newCurrentOrder = targetOrder === currentOrder ? targetOrder + direction : targetOrder;
+        const newTargetOrder = targetOrder === currentOrder ? currentOrder : currentOrder;
+
+        // 낙관적 업데이트
+        setSavedComments(prev => {
+            const next = [...prev];
+            next[index] = { ...next[index], sort_order: newCurrentOrder };
+            next[targetIndex] = { ...next[targetIndex], sort_order: newTargetOrder };
+            // swap positions
+            [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+            return next;
+        });
+
+        try {
+            await savedCommentsApi.reorder(current.id, currentOrder, target.id, targetOrder);
+        } catch (err) {
+            console.error('순서 변경 오류:', err);
+            // 실패 시 원복
+            setSavedComments(prev => {
+                const next = [...prev];
+                // find by id and swap back
+                const i = next.findIndex(c => c.id === current.id);
+                const j = next.findIndex(c => c.id === target.id);
+                if (i !== -1 && j !== -1) {
+                    next[i] = { ...next[i], sort_order: currentOrder };
+                    next[j] = { ...next[j], sort_order: targetOrder };
+                    [next[i], next[j]] = [next[j], next[i]];
+                }
+                return next;
+            });
+        }
     };
 
     const formatDate = (dateString) => {
@@ -952,11 +1004,37 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                                 저장한 댓글 ({savedComments.length})
                             </h4>
                             <div className="space-y-2">
-                                {savedComments.map(sc => (
+                                {savedComments.map((sc, scIdx) => (
                                     <div key={sc.id} className="px-3 py-2 bg-amber-50 rounded-lg border border-amber-100">
                                         <div className="flex items-center justify-between mb-1">
                                             <span className="text-xs font-medium text-gray-700">{sc.author}</span>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1">
+                                                {savedComments.length > 1 && (
+                                                    <div className="flex items-center mr-1">
+                                                        {scIdx > 0 && (
+                                                            <button
+                                                                onClick={() => handleReorderComment(scIdx, -1)}
+                                                                className="p-0.5 text-gray-400 hover:text-sky-500 transition-colors"
+                                                                title="위로"
+                                                            >
+                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                                                </svg>
+                                                            </button>
+                                                        )}
+                                                        {scIdx < savedComments.length - 1 && (
+                                                            <button
+                                                                onClick={() => handleReorderComment(scIdx, 1)}
+                                                                className="p-0.5 text-gray-400 hover:text-sky-500 transition-colors"
+                                                                title="아래로"
+                                                            >
+                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                                </svg>
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
                                                 <button
                                                     onClick={() => {
                                                         setMemoPopup({

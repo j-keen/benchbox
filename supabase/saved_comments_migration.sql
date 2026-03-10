@@ -9,8 +9,13 @@ CREATE TABLE saved_comments (
     like_count INTEGER DEFAULT 0,
     published_at VARCHAR(50),
     memo TEXT DEFAULT '',
+    sort_order INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- sort_order: 순서 변경 기능용 (낮을수록 위에 표시, 새 댓글은 음수로 최상단 배치)
+-- 기존 데이터는 sort_order = 0이며, created_at DESC로 폴백 정렬
+-- ALTER TABLE saved_comments ADD COLUMN sort_order INTEGER DEFAULT 0;
 
 -- 인덱스
 CREATE INDEX idx_saved_comments_video_id ON saved_comments(video_id);
