@@ -48,3 +48,4 @@ temp/
 
 # Test coverage
 coverage/
+.vercel

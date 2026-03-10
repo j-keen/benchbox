@@ -13,6 +13,7 @@ import MobileAddModal from '../components/MobileAddModal';
 import TagManagerModal from '../components/TagManagerModal';
 import FABMenu from '../components/FABMenu';
 import FilterPanel from '../components/FilterPanel';
+import TagCarousel from '../components/TagCarousel';
 import ApiKeySettingsModal from '../components/ApiKeySettingsModal';
 import { VideoGridSkeleton } from '../components/Skeleton';
 import { getPlatformName } from '../utils/platformIcons';
@@ -959,6 +960,15 @@ const Home = () => {
             </header>
 
             <main className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-6">
+                {/* 태그 탐색 캐러셀 */}
+                {allTags.length > 0 && (
+                    <TagCarousel
+                        tags={allTags}
+                        activeTag={filterTag}
+                        onTagSelect={setFilterTag}
+                    />
+                )}
+
                 {/* 필터 바 */}
                 <div className="mb-5">
                     <div className="flex items-center gap-2 flex-wrap">
