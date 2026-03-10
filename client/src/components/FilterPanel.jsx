@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import useModalHistory from '../hooks/useModalHistory';
 
 const FilterPanel = ({
   searchQuery,
   onSearchChange,
   searchPlaceholder = '검색...',
   filterGroups = [],
-  sortGroup = null,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+
+  // 모바일 뒤로가기 시 패널 닫기
+  useModalHistory(isOpen, () => setIsOpen(false));
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const debounceRef = useRef(null);
 
@@ -59,7 +62,6 @@ const FilterPanel = ({
 
   const handleClearAll = () => {
     filterGroups.forEach(g => handleClearFilter(g));
-    if (sortGroup) sortGroup.onChange(sortGroup.options[0]?.value || 'newest');
   };
 
   return (
@@ -89,7 +91,7 @@ const FilterPanel = ({
           )}
         </div>
 
-        {(filterGroups.length > 0 || sortGroup) && (
+        {filterGroups.length > 0 && (
           <button
             onClick={() => setIsOpen(!isOpen)}
             className={`relative flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-lg border transition-colors ${
@@ -117,16 +119,6 @@ const FilterPanel = ({
         }`}
       >
         <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
-          {/* 정렬 */}
-          {sortGroup && (
-            <FilterGroup
-              label={sortGroup.label}
-              options={sortGroup.options}
-              value={sortGroup.value}
-              onChange={sortGroup.onChange}
-            />
-          )}
-
           {/* 필터 그룹들 */}
           {filterGroups.map(group => (
             <div key={group.key}>
@@ -149,7 +141,7 @@ const FilterPanel = ({
           ))}
 
           {/* 필터 초기화 */}
-          {(activeFilterCount > 0 || (sortGroup && sortGroup.value !== sortGroup.options[0]?.value)) && (
+          {activeFilterCount > 0 && (
             <button
               onClick={handleClearAll}
               className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"

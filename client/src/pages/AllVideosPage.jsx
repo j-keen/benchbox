@@ -260,18 +260,6 @@ const AllVideosPage = () => {
         },
     ];
 
-    const sortGroup = {
-        label: '정렬',
-        options: [
-            { value: 'newest', label: '최신순' },
-            { value: 'oldest', label: '오래된순' },
-            { value: 'title', label: '제목순' },
-            { value: 'rating_desc', label: '별점순' },
-        ],
-        value: sortBy,
-        onChange: setSortBy,
-    };
-
     return (
         <div className="min-h-screen bg-gray-50">
             <NavigationTabs />
@@ -283,6 +271,16 @@ const AllVideosPage = () => {
                         <div className="flex items-center gap-2 sm:gap-4">
                             <h1 className="text-xl font-bold text-gray-900">전체 영상</h1>
                             <span className="text-xs sm:text-sm text-gray-500">{videos.length}개</span>
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                            >
+                                <option value="newest">최신순</option>
+                                <option value="oldest">오래된순</option>
+                                <option value="title">제목순</option>
+                                <option value="rating_desc">별점순</option>
+                            </select>
                             {checkedCount > 0 && (
                                 <button
                                     onClick={handleExportChecked}
@@ -312,7 +310,6 @@ const AllVideosPage = () => {
                         onSearchChange={setSearchQuery}
                         searchPlaceholder="제목, 메모, 태그 검색..."
                         filterGroups={filterGroups}
-                        sortGroup={sortGroup}
                     />
                 </div>
 

@@ -832,18 +832,6 @@ const Home = () => {
         },
     ];
 
-    const sortGroup = {
-        label: '정렬',
-        options: [
-            { value: 'newest', label: '최신순' },
-            { value: 'oldest', label: '오래된순' },
-            { value: 'title', label: '제목순' },
-            { value: 'rating_desc', label: '별점순' },
-        ],
-        value: sortBy,
-        onChange: setSortBy,
-    };
-
     return (
         <div className="min-h-screen bg-gray-50">
             {/* 헤더 */}
@@ -859,7 +847,6 @@ const Home = () => {
                         onSearchChange={setSearchQuery}
                         searchPlaceholder="제목, 메모, 태그 검색... (Ctrl+K)"
                         filterGroups={filterGroups}
-                        sortGroup={sortGroup}
                     />
 
                     {/* 데스크탑/태블릿: URL 입력 */}
@@ -1543,6 +1530,7 @@ const Home = () => {
                                 <option value="newest">최신순</option>
                                 <option value="oldest">오래된순</option>
                                 <option value="title">제목순</option>
+                                <option value="rating_desc">별점순</option>
                             </select>
                         </div>
                     </div>
