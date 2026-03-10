@@ -967,6 +967,7 @@ const Home = () => {
                         tags={allTags}
                         activeTag={filterTag}
                         onTagSelect={setFilterTag}
+                        isVisible={filterTag !== ''}
                     />
                 )}
 

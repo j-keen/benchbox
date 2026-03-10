@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 
-const TagCarousel = ({ tags, activeTag, onTagSelect }) => {
+const TagCarousel = ({ tags, activeTag, onTagSelect, isVisible = true }) => {
     const scrollRef = useRef(null);
     const isAutoScrolling = useRef(false);
     const debounceRef = useRef(null);
@@ -18,7 +18,7 @@ const TagCarousel = ({ tags, activeTag, onTagSelect }) => {
             if (chip) {
                 chip.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
             }
-            setTimeout(() => { isAutoScrolling.current = false; }, 500);
+            setTimeout(() => { isAutoScrolling.current = false; }, 300);
         });
     }, [activeTag]);
 
@@ -48,7 +48,7 @@ const TagCarousel = ({ tags, activeTag, onTagSelect }) => {
 
     // 스크롤 이벤트 → 가운데 칩 자동 선택
     const handleScroll = useCallback(() => {
-        if (isAutoScrolling.current) return;
+        if (isAutoScrolling.current || !isVisible) return;
 
         const centerTag = findCenterTag();
         if (centerTag === null) return;
@@ -60,8 +60,8 @@ const TagCarousel = ({ tags, activeTag, onTagSelect }) => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
             onTagSelect(centerTag);
-        }, 300);
-    }, [findCenterTag, onTagSelect]);
+        }, 150);
+    }, [findCenterTag, onTagSelect, isVisible]);
 
     // cleanup debounce
     useEffect(() => {
@@ -99,21 +99,25 @@ const TagCarousel = ({ tags, activeTag, onTagSelect }) => {
             if (chip) {
                 chip.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
             }
-            setTimeout(() => { isAutoScrolling.current = false; }, 500);
+            setTimeout(() => { isAutoScrolling.current = false; }, 300);
         });
     }, [visualTag, onTagSelect]);
 
-    const chipBase = 'flex-shrink-0 rounded-full px-4 py-2.5 text-sm font-medium min-h-[44px] transition-all duration-200 cursor-pointer select-none';
+    const chipBase = 'flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-medium min-h-[32px] transition-all duration-200 cursor-pointer select-none';
     const chipActive = 'bg-primary-500 text-white shadow-md';
     const chipInactive = 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100';
 
     return (
-        <div className="mb-2">
+        <div
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                isVisible ? 'max-h-[48px] opacity-100 mb-2' : 'max-h-0 opacity-0 mb-0'
+            }`}
+        >
             {/* 스크롤 영역 */}
             <div
                 ref={scrollRef}
                 onScroll={handleScroll}
-                className="flex gap-2 overflow-x-auto scrollbar-hide pb-1"
+                className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1"
                 style={{ WebkitOverflowScrolling: 'touch' }}
             >
                 {/* 전체 칩 */}
