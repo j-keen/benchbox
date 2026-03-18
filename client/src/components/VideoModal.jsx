@@ -149,20 +149,39 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete, videos, currentIndex, 
     const canGoPrev = videos && currentIndex > 0;
     const canGoNext = videos && currentIndex < (videos?.length || 0) - 1;
 
+    // 애니메이션 포함 네비게이션 (먼저 선언)
+    const navigateWithAnimation = useCallback((direction) => {
+        if (isAnimating) return;
+        setIsAnimating(true);
+        setSlideDirection(direction);
+
+        setTimeout(() => {
+            if (direction === 'left') {
+                onNavigate(currentIndex + 1);
+            } else {
+                onNavigate(currentIndex - 1);
+            }
+            setSlideDirection(direction === 'left' ? 'enter-right' : 'enter-left');
+            setTimeout(() => {
+                setSlideDirection(null);
+                setIsAnimating(false);
+            }, 200);
+        }, 150);
+    }, [currentIndex, onNavigate, isAnimating]);
+
     // 키보드 네비게이션
     useEffect(() => {
         if (!videos || !onNavigate) return;
         const handleKeyDown = (e) => {
-            // 입력 필드에서는 비활성화
             const isInputFocused = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
             if (isInputFocused) return;
 
             if (e.key === 'ArrowLeft' && canGoPrev) {
                 e.preventDefault();
-                navigateWithAnimation('right'); // 이전: 오른쪽에서 들어옴
+                navigateWithAnimation('right');
             } else if (e.key === 'ArrowRight' && canGoNext) {
                 e.preventDefault();
-                navigateWithAnimation('left'); // 다음: 왼쪽으로 나감
+                navigateWithAnimation('left');
             }
         };
         document.addEventListener('keydown', handleKeyDown);
@@ -183,7 +202,6 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete, videos, currentIndex, 
         const diffX = touchStartX.current - touchEndX;
         const diffY = Math.abs(touchStartY.current - touchEndY);
 
-        // 수평 스와이프만 감지 (최소 60px, 수직보다 수평이 더 클 때)
         if (Math.abs(diffX) > 60 && Math.abs(diffX) > diffY) {
             if (diffX > 0 && canGoNext) {
                 navigateWithAnimation('left');
@@ -194,27 +212,6 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete, videos, currentIndex, 
         touchStartX.current = null;
         touchStartY.current = null;
     }, [videos, currentIndex, onNavigate, canGoPrev, canGoNext, isAnimating]);
-
-    // 애니메이션 포함 네비게이션
-    const navigateWithAnimation = useCallback((direction) => {
-        if (isAnimating) return;
-        setIsAnimating(true);
-        setSlideDirection(direction);
-
-        setTimeout(() => {
-            if (direction === 'left') {
-                onNavigate(currentIndex + 1);
-            } else {
-                onNavigate(currentIndex - 1);
-            }
-            // 새 영상이 반대 방향에서 들어오는 효과
-            setSlideDirection(direction === 'left' ? 'enter-right' : 'enter-left');
-            setTimeout(() => {
-                setSlideDirection(null);
-                setIsAnimating(false);
-            }, 200);
-        }, 150);
-    }, [currentIndex, onNavigate, isAnimating]);
 
     // AI 상태
     const [aiMemoLoading, setAiMemoLoading] = useState(false);
