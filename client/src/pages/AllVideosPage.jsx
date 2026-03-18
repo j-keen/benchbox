@@ -115,9 +115,17 @@ const AllVideosPage = () => {
         setSelectedVideo(updatedVideo);
     };
 
-    const handleVideoDelete = (videoId) => {
-        setVideos(prev => prev.filter(v => v.id !== videoId));
-        setSelectedVideo(null);
+    const handleVideoDelete = (videoId, deletedIndex) => {
+        setVideos(prev => {
+            const next = prev.filter(v => v.id !== videoId);
+            if (next.length > 0 && deletedIndex !== undefined) {
+                const nextIdx = deletedIndex < next.length ? deletedIndex : next.length - 1;
+                setSelectedVideo(next[nextIdx]);
+            } else {
+                setSelectedVideo(null);
+            }
+            return next;
+        });
     };
 
     const handleVideoSelect = (videoId) => {
@@ -431,6 +439,9 @@ const AllVideosPage = () => {
                     onClose={() => setSelectedVideo(null)}
                     onUpdate={handleVideoUpdate}
                     onDelete={handleVideoDelete}
+                    videos={videos}
+                    currentIndex={videos.findIndex(v => v.id === selectedVideo.id)}
+                    onNavigate={(idx) => setSelectedVideo(videos[idx])}
                 />
             )}
 

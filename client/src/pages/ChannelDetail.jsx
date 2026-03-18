@@ -240,8 +240,17 @@ const ChannelDetail = () => {
     };
 
     // 영상 삭제 처리
-    const handleVideoDelete = (videoId) => {
-        setVideos(prev => prev.filter(v => v.id !== videoId));
+    const handleVideoDelete = (videoId, deletedIndex) => {
+        setVideos(prev => {
+            const next = prev.filter(v => v.id !== videoId);
+            if (next.length > 0 && deletedIndex !== undefined) {
+                const nextIdx = deletedIndex < next.length ? deletedIndex : next.length - 1;
+                setSelectedVideo(next[nextIdx]);
+            } else {
+                setSelectedVideo(null);
+            }
+            return next;
+        });
     };
 
     // 영상 선택 토글
@@ -755,6 +764,9 @@ const ChannelDetail = () => {
                     onClose={() => setSelectedVideo(null)}
                     onUpdate={handleVideoUpdate}
                     onDelete={handleVideoDelete}
+                    videos={videos}
+                    currentIndex={videos.findIndex(v => v.id === selectedVideo.id)}
+                    onNavigate={(idx) => setSelectedVideo(videos[idx])}
                 />
             )}
         </div>

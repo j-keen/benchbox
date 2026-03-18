@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { videosApi, aiAssistApi, youtubeCommentsApi, savedCommentsApi } from '../utils/api';
 import { getPlatformIcon, getPlatformColor, getPlatformName } from '../utils/platformIcons';
 import TagInput from './TagInput';
@@ -6,7 +9,125 @@ import StarRating from './StarRating';
 import CategoryButtons from './CategoryButtons';
 import useModalHistory from '../hooks/useModalHistory';
 
-const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
+// 드래그 가능한 저장 댓글 아이템
+const SortableCommentItem = ({ sc, scIdx, totalCount, handleReorderComment, handleMoveToEdge, setMemoPopup, setMemoPopupValue, savedCommentsApi, setSavedComments }) => {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sc.id });
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className={`px-3 py-2 bg-amber-50 rounded-lg border border-amber-100 flex gap-2 ${isDragging ? 'shadow-lg' : ''}`}>
+            {/* 드래그 핸들 */}
+            {totalCount > 1 && (
+                <button
+                    {...attributes}
+                    {...listeners}
+                    className="flex-shrink-0 flex items-center touch-none text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing"
+                    style={{ minWidth: 20, minHeight: 44 }}
+                    title="드래그하여 순서 변경"
+                >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="9" cy="5" r="1.5" /><circle cx="15" cy="5" r="1.5" />
+                        <circle cx="9" cy="10" r="1.5" /><circle cx="15" cy="10" r="1.5" />
+                        <circle cx="9" cy="15" r="1.5" /><circle cx="15" cy="15" r="1.5" />
+                        <circle cx="9" cy="20" r="1.5" /><circle cx="15" cy="20" r="1.5" />
+                    </svg>
+                </button>
+            )}
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-gray-700">{sc.author}</span>
+                    <div className="flex items-center gap-1">
+                        {totalCount > 1 && (
+                            <div className="flex items-center mr-1">
+                                {scIdx > 0 && (
+                                    <>
+                                        <button
+                                            onClick={() => handleMoveToEdge(scIdx, 'top')}
+                                            className="p-0.5 text-gray-400 hover:text-sky-500 transition-colors"
+                                            title="맨 위로"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7M5 19l7-7 7 7" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            onClick={() => handleReorderComment(scIdx, -1)}
+                                            className="p-0.5 text-gray-400 hover:text-sky-500 transition-colors"
+                                            title="위로"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                            </svg>
+                                        </button>
+                                    </>
+                                )}
+                                {scIdx < totalCount - 1 && (
+                                    <>
+                                        <button
+                                            onClick={() => handleReorderComment(scIdx, 1)}
+                                            className="p-0.5 text-gray-400 hover:text-sky-500 transition-colors"
+                                            title="아래로"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            onClick={() => handleMoveToEdge(scIdx, 'bottom')}
+                                            className="p-0.5 text-gray-400 hover:text-sky-500 transition-colors"
+                                            title="맨 아래로"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5l7 7 7-7M5 13l7 7 7-7" />
+                                            </svg>
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                        <button
+                            onClick={() => {
+                                setMemoPopup({
+                                    comment: { author: sc.author, text: sc.text, likeCount: sc.like_count, publishedAt: sc.published_at },
+                                    idx: -1,
+                                    savedId: sc.id,
+                                    existingMemo: sc.memo || '',
+                                });
+                                setMemoPopupValue(sc.memo || '');
+                            }}
+                            className="text-[10px] text-gray-400 hover:text-amber-500 transition-colors"
+                        >
+                            메모
+                        </button>
+                        <button
+                            onClick={async () => {
+                                try {
+                                    await savedCommentsApi.delete(sc.id);
+                                    setSavedComments(prev => prev.filter(c => c.id !== sc.id));
+                                } catch (err) { console.error(err); }
+                            }}
+                            className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                            삭제
+                        </button>
+                    </div>
+                </div>
+                <p className="text-xs text-gray-600 whitespace-pre-wrap">{sc.text}</p>
+                {sc.memo && (
+                    <div className="mt-1 px-2 py-1 bg-white rounded text-[10px] text-amber-700">
+                        {sc.memo}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const VideoModal = ({ video, onClose, onUpdate, onDelete, videos, currentIndex, onNavigate }) => {
     useModalHistory(!!video, onClose);
     const [memo, setMemo] = useState(video?.memo || '');
     const [tags, setTags] = useState(video?.tags || []);
@@ -19,6 +140,81 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
     const [embedFailed, setEmbedFailed] = useState(false);
     const [embedLoading, setEmbedLoading] = useState(true);
     const [isWidescreen, setIsWidescreen] = useState(false);
+    const [slideDirection, setSlideDirection] = useState(null); // 'left' | 'right' | null
+    const [isAnimating, setIsAnimating] = useState(false);
+    const touchStartX = useRef(null);
+    const touchStartY = useRef(null);
+    const modalContentRef = useRef(null);
+
+    const canGoPrev = videos && currentIndex > 0;
+    const canGoNext = videos && currentIndex < (videos?.length || 0) - 1;
+
+    // 키보드 네비게이션
+    useEffect(() => {
+        if (!videos || !onNavigate) return;
+        const handleKeyDown = (e) => {
+            // 입력 필드에서는 비활성화
+            const isInputFocused = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+            if (isInputFocused) return;
+
+            if (e.key === 'ArrowLeft' && canGoPrev) {
+                e.preventDefault();
+                navigateWithAnimation('right'); // 이전: 오른쪽에서 들어옴
+            } else if (e.key === 'ArrowRight' && canGoNext) {
+                e.preventDefault();
+                navigateWithAnimation('left'); // 다음: 왼쪽으로 나감
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [videos, onNavigate, canGoPrev, canGoNext, navigateWithAnimation]);
+
+    // 스와이프 제스처
+    const handleTouchStart = useCallback((e) => {
+        if (!videos || !onNavigate) return;
+        touchStartX.current = e.touches[0].clientX;
+        touchStartY.current = e.touches[0].clientY;
+    }, [videos, onNavigate]);
+
+    const handleTouchEnd = useCallback((e) => {
+        if (!videos || !onNavigate || touchStartX.current === null || isAnimating) return;
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        const diffX = touchStartX.current - touchEndX;
+        const diffY = Math.abs(touchStartY.current - touchEndY);
+
+        // 수평 스와이프만 감지 (최소 60px, 수직보다 수평이 더 클 때)
+        if (Math.abs(diffX) > 60 && Math.abs(diffX) > diffY) {
+            if (diffX > 0 && canGoNext) {
+                navigateWithAnimation('left');
+            } else if (diffX < 0 && canGoPrev) {
+                navigateWithAnimation('right');
+            }
+        }
+        touchStartX.current = null;
+        touchStartY.current = null;
+    }, [videos, currentIndex, onNavigate, canGoPrev, canGoNext, isAnimating]);
+
+    // 애니메이션 포함 네비게이션
+    const navigateWithAnimation = useCallback((direction) => {
+        if (isAnimating) return;
+        setIsAnimating(true);
+        setSlideDirection(direction);
+
+        setTimeout(() => {
+            if (direction === 'left') {
+                onNavigate(currentIndex + 1);
+            } else {
+                onNavigate(currentIndex - 1);
+            }
+            // 새 영상이 반대 방향에서 들어오는 효과
+            setSlideDirection(direction === 'left' ? 'enter-right' : 'enter-left');
+            setTimeout(() => {
+                setSlideDirection(null);
+                setIsAnimating(false);
+            }, 200);
+        }, 150);
+    }, [currentIndex, onNavigate, isAnimating]);
 
     // AI 상태
     const [aiMemoLoading, setAiMemoLoading] = useState(false);
@@ -43,6 +239,24 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
 
     const PlatformIcon = getPlatformIcon(video?.platform);
     const platformColor = getPlatformColor(video?.platform);
+
+    // video가 변경되면 (네비게이션) 로컬 state 동기화
+    useEffect(() => {
+        if (video) {
+            setMemo(video.memo || '');
+            setTags(video.tags || []);
+            setCategories(video.categories || []);
+            setRating(video.rating || 3);
+            setDownloadCheck(video.download_check || false);
+            setShowDeleteConfirm(false);
+            setSuggestedTags([]);
+            setOriginalMemo(null);
+            setComments([]);
+            setShowComments(false);
+            setLinkCopied(false);
+            setCommentsDisabled(false);
+        }
+    }, [video?.id]);
 
     // 디바운스 저장
     const debouncedSave = useCallback(
@@ -98,6 +312,18 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
         return () => clearTimeout(timer);
     }, [video?.id]);
 
+    // 이전/다음 영상 썸네일 프리로딩
+    useEffect(() => {
+        if (!videos) return;
+        const toPreload = [];
+        if (currentIndex > 0) toPreload.push(videos[currentIndex - 1]?.thumbnail);
+        if (currentIndex < videos.length - 1) toPreload.push(videos[currentIndex + 1]?.thumbnail);
+        toPreload.filter(Boolean).forEach(src => {
+            const img = new Image();
+            img.src = src;
+        });
+    }, [videos, currentIndex]);
+
     const handleEmbedProblem = () => {
         setEmbedFailed(true);
         setEmbedLoading(false);
@@ -108,8 +334,7 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
         setDeleting(true);
         try {
             await videosApi.delete(video.id);
-            onDelete(video.id);
-            onClose();
+            onDelete(video.id, currentIndex);
         } catch (error) {
             console.error('삭제 오류:', error);
         } finally {
@@ -334,45 +559,80 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
 
     // 저장 댓글 순서 변경 (위/아래 swap)
     const handleReorderComment = async (index, direction) => {
-        const targetIndex = index + direction; // direction: -1 (위), +1 (아래)
+        const targetIndex = index + direction;
         if (targetIndex < 0 || targetIndex >= savedComments.length) return;
 
-        const current = savedComments[index];
-        const target = savedComments[targetIndex];
-        const currentOrder = current.sort_order ?? 0;
-        const targetOrder = target.sort_order ?? 0;
+        const prevComments = [...savedComments];
 
-        // 같은 sort_order면 구분을 위해 값 조정
-        const newCurrentOrder = targetOrder === currentOrder ? targetOrder + direction : targetOrder;
-        const newTargetOrder = targetOrder === currentOrder ? currentOrder : currentOrder;
-
-        // 낙관적 업데이트
+        // 낙관적 업데이트: 배열에서 위치 swap
         setSavedComments(prev => {
             const next = [...prev];
-            next[index] = { ...next[index], sort_order: newCurrentOrder };
-            next[targetIndex] = { ...next[targetIndex], sort_order: newTargetOrder };
-            // swap positions
             [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
             return next;
         });
 
         try {
-            await savedCommentsApi.reorder(current.id, currentOrder, target.id, targetOrder);
+            const reordered = [...prevComments];
+            [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
+            await savedCommentsApi.reorder(reordered.map(c => c.id));
         } catch (err) {
             console.error('순서 변경 오류:', err);
-            // 실패 시 원복
-            setSavedComments(prev => {
-                const next = [...prev];
-                // find by id and swap back
-                const i = next.findIndex(c => c.id === current.id);
-                const j = next.findIndex(c => c.id === target.id);
-                if (i !== -1 && j !== -1) {
-                    next[i] = { ...next[i], sort_order: currentOrder };
-                    next[j] = { ...next[j], sort_order: targetOrder };
-                    [next[i], next[j]] = [next[j], next[i]];
-                }
-                return next;
-            });
+            setSavedComments(prevComments);
+        }
+    };
+
+    // 저장 댓글 맨위/맨아래로 이동
+    const handleMoveToEdge = async (index, edge) => {
+        if (savedComments.length <= 1) return;
+        if (edge === 'top' && index === 0) return;
+        if (edge === 'bottom' && index === savedComments.length - 1) return;
+
+        const prevComments = [...savedComments];
+
+        setSavedComments(prev => {
+            const next = [...prev];
+            const [item] = next.splice(index, 1);
+            if (edge === 'top') next.unshift(item);
+            else next.push(item);
+            return next;
+        });
+
+        try {
+            const reordered = [...prevComments];
+            const [item] = reordered.splice(index, 1);
+            if (edge === 'top') reordered.unshift(item);
+            else reordered.push(item);
+            await savedCommentsApi.reorder(reordered.map(c => c.id));
+        } catch (err) {
+            console.error('순서 변경 오류:', err);
+            setSavedComments(prevComments);
+        }
+    };
+
+    // 드래그앤드롭 센서
+    const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } });
+    const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } });
+    const sensors = useSensors(pointerSensor, touchSensor);
+
+    // 드래그앤드롭 완료
+    const handleDragEnd = async (event) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        const oldIndex = savedComments.findIndex(c => c.id === active.id);
+        const newIndex = savedComments.findIndex(c => c.id === over.id);
+        if (oldIndex === -1 || newIndex === -1) return;
+
+        const prevComments = [...savedComments];
+        const reordered = arrayMove(savedComments, oldIndex, newIndex);
+
+        setSavedComments(reordered);
+
+        try {
+            await savedCommentsApi.reorder(reordered.map(c => c.id));
+        } catch (err) {
+            console.error('드래그 순서 변경 오류:', err);
+            setSavedComments(prevComments);
         }
     };
 
@@ -413,11 +673,24 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
 
     if (!video) return null;
 
+    const slideAnimationClass = slideDirection === 'left'
+        ? 'translate-x-[-30px] opacity-0'
+        : slideDirection === 'right'
+            ? 'translate-x-[30px] opacity-0'
+            : slideDirection === 'enter-left'
+                ? 'translate-x-0 opacity-100'
+                : slideDirection === 'enter-right'
+                    ? 'translate-x-0 opacity-100'
+                    : '';
+
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" onClick={onClose}>
             <div
-                className="bg-white w-full sm:rounded-xl shadow-2xl sm:w-full sm:max-w-4xl max-h-[98vh] sm:max-h-[95vh] overflow-hidden flex flex-col rounded-t-2xl sm:rounded-b-xl"
+                ref={modalContentRef}
+                className={`bg-white w-full sm:rounded-xl shadow-2xl sm:w-full sm:max-w-4xl max-h-[98vh] sm:max-h-[95vh] overflow-hidden flex flex-col rounded-t-2xl sm:rounded-b-xl transition-all duration-150 ease-out ${slideAnimationClass}`}
                 onClick={e => e.stopPropagation()}
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
             >
                 {/* 모바일: 드래그 핸들 */}
                 <div className="sm:hidden flex justify-center py-2">
@@ -431,6 +704,27 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                             <PlatformIcon className="w-3 h-3" />
                             <span className="hidden sm:inline">{getPlatformName(video.platform)}</span>
                         </span>
+                        {videos && videos.length > 1 && (
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => canGoPrev && navigateWithAnimation('right')}
+                                    disabled={!canGoPrev || isAnimating}
+                                    className={`p-0.5 rounded transition-colors ${canGoPrev ? 'text-gray-500 hover:text-sky-500 hover:bg-sky-50' : 'text-gray-200 cursor-default'}`}
+                                    title="이전 영상 (←)"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                                </button>
+                                <span className="text-[10px] sm:text-xs text-gray-400 tabular-nums min-w-[3ch] text-center">{currentIndex + 1} / {videos.length}</span>
+                                <button
+                                    onClick={() => canGoNext && navigateWithAnimation('left')}
+                                    disabled={!canGoNext || isAnimating}
+                                    className={`p-0.5 rounded transition-colors ${canGoNext ? 'text-gray-500 hover:text-sky-500 hover:bg-sky-50' : 'text-gray-200 cursor-default'}`}
+                                    title="다음 영상 (→)"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                </button>
+                            </div>
+                        )}
                         {saving && (
                             <span className="text-[10px] sm:text-xs text-gray-400">저장 중...</span>
                         )}
@@ -1003,74 +1297,26 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete }) => {
                                 </svg>
                                 저장한 댓글 ({savedComments.length})
                             </h4>
-                            <div className="space-y-2">
-                                {savedComments.map((sc, scIdx) => (
-                                    <div key={sc.id} className="px-3 py-2 bg-amber-50 rounded-lg border border-amber-100">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-xs font-medium text-gray-700">{sc.author}</span>
-                                            <div className="flex items-center gap-1">
-                                                {savedComments.length > 1 && (
-                                                    <div className="flex items-center mr-1">
-                                                        {scIdx > 0 && (
-                                                            <button
-                                                                onClick={() => handleReorderComment(scIdx, -1)}
-                                                                className="p-0.5 text-gray-400 hover:text-sky-500 transition-colors"
-                                                                title="위로"
-                                                            >
-                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                                                                </svg>
-                                                            </button>
-                                                        )}
-                                                        {scIdx < savedComments.length - 1 && (
-                                                            <button
-                                                                onClick={() => handleReorderComment(scIdx, 1)}
-                                                                className="p-0.5 text-gray-400 hover:text-sky-500 transition-colors"
-                                                                title="아래로"
-                                                            >
-                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                                </svg>
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                )}
-                                                <button
-                                                    onClick={() => {
-                                                        setMemoPopup({
-                                                            comment: { author: sc.author, text: sc.text, likeCount: sc.like_count, publishedAt: sc.published_at },
-                                                            idx: -1,
-                                                            savedId: sc.id,
-                                                            existingMemo: sc.memo || '',
-                                                        });
-                                                        setMemoPopupValue(sc.memo || '');
-                                                    }}
-                                                    className="text-[10px] text-gray-400 hover:text-amber-500 transition-colors"
-                                                >
-                                                    메모
-                                                </button>
-                                                <button
-                                                    onClick={async () => {
-                                                        try {
-                                                            await savedCommentsApi.delete(sc.id);
-                                                            setSavedComments(prev => prev.filter(c => c.id !== sc.id));
-                                                        } catch (err) { console.error(err); }
-                                                    }}
-                                                    className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
-                                                >
-                                                    삭제
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-gray-600 whitespace-pre-wrap">{sc.text}</p>
-                                        {sc.memo && (
-                                            <div className="mt-1 px-2 py-1 bg-white rounded text-[10px] text-amber-700">
-                                                {sc.memo}
-                                            </div>
-                                        )}
+                            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                                <SortableContext items={savedComments.map(sc => sc.id)} strategy={verticalListSortingStrategy}>
+                                    <div className="space-y-2">
+                                        {savedComments.map((sc, scIdx) => (
+                                            <SortableCommentItem
+                                                key={sc.id}
+                                                sc={sc}
+                                                scIdx={scIdx}
+                                                totalCount={savedComments.length}
+                                                handleReorderComment={handleReorderComment}
+                                                handleMoveToEdge={handleMoveToEdge}
+                                                setMemoPopup={setMemoPopup}
+                                                setMemoPopupValue={setMemoPopupValue}
+                                                savedCommentsApi={savedCommentsApi}
+                                                setSavedComments={setSavedComments}
+                                            />
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
+                                </SortableContext>
+                            </DndContext>
                         </div>
                     )}
                 </div>

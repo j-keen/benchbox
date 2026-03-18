@@ -136,9 +136,18 @@ const FolderDetail = () => {
     };
 
     // 영상 삭제 처리
-    const handleVideoDelete = (videoId) => {
+    const handleVideoDelete = (videoId, deletedIndex) => {
+        // sortedVideos 기준으로 다음 영상 결정 (삭제 전 시점)
+        const currentSorted = sortedVideos;
+        const idxInSorted = currentSorted.findIndex(v => v.id === videoId);
+        let nextVideo = null;
+        if (currentSorted.length > 1 && idxInSorted !== -1) {
+            nextVideo = idxInSorted < currentSorted.length - 1
+                ? currentSorted[idxInSorted + 1]
+                : currentSorted[idxInSorted - 1];
+        }
         setVideos(prev => prev.filter(v => v.id !== videoId));
-        setSelectedVideo(null);
+        setSelectedVideo(nextVideo);
     };
 
     // 채널 썸네일 수정
@@ -632,6 +641,9 @@ const FolderDetail = () => {
                     onClose={() => setSelectedVideo(null)}
                     onUpdate={handleVideoUpdate}
                     onDelete={handleVideoDelete}
+                    videos={sortedVideos}
+                    currentIndex={sortedVideos.findIndex(v => v.id === selectedVideo.id)}
+                    onNavigate={(idx) => setSelectedVideo(sortedVideos[idx])}
                 />
             )}
 

@@ -405,8 +405,18 @@ const Home = () => {
     };
 
     // 영상 삭제 처리
-    const handleVideoDelete = (videoId) => {
-        setVideos(prev => prev.filter(v => v.id !== videoId));
+    const handleVideoDelete = (videoId, deletedIndex) => {
+        setVideos(prev => {
+            const next = prev.filter(v => v.id !== videoId);
+            // 삭제 후 자동 네비게이션: 다음 영상 → 이전 영상 → 모달 닫기
+            if (next.length > 0 && deletedIndex !== undefined) {
+                const nextIdx = deletedIndex < next.length ? deletedIndex : next.length - 1;
+                setSelectedVideo(next[nextIdx]);
+            } else {
+                setSelectedVideo(null);
+            }
+            return next;
+        });
     };
 
     // 영상을 채널로 드래그앤드롭 이동
@@ -1677,6 +1687,9 @@ const Home = () => {
                     onClose={() => setSelectedVideo(null)}
                     onUpdate={handleVideoUpdate}
                     onDelete={handleVideoDelete}
+                    videos={videos}
+                    currentIndex={videos.findIndex(v => v.id === selectedVideo.id)}
+                    onNavigate={(idx) => setSelectedVideo(videos[idx])}
                 />
             )}
 
