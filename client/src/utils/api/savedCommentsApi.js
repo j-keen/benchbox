@@ -53,19 +53,17 @@ export const savedCommentsApi = {
         return data;
     },
 
-    // 두 댓글의 sort_order swap
-    reorder: async (id1, order1, id2, order2) => {
-        const { error: err1 } = await supabase
-            .from('saved_comments')
-            .update({ sort_order: order2 })
-            .eq('id', id1);
-        if (err1) throw err1;
-
-        const { error: err2 } = await supabase
-            .from('saved_comments')
-            .update({ sort_order: order1 })
-            .eq('id', id2);
-        if (err2) throw err2;
+    // 전체 댓글 순서 재정렬 (ID 배열 순서대로 0, 1, 2... 부여)
+    reorder: async (commentIds) => {
+        const updates = commentIds.map((id, index) =>
+            supabase
+                .from('saved_comments')
+                .update({ sort_order: index })
+                .eq('id', id)
+        );
+        const results = await Promise.all(updates);
+        const failed = results.find(r => r.error);
+        if (failed?.error) throw failed.error;
     },
 
     // 저장 취소 (삭제)

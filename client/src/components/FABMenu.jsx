@@ -72,9 +72,11 @@ export default function FABMenu({
     }, []);
 
     // 액션 실행 후 메뉴 닫기
+    // FABMenu를 먼저 닫아 히스토리 cleanup을 완료한 뒤, 새 모달을 열어야
+    // popstate 충돌로 새 모달이 바로 닫히는 문제를 방지할 수 있음
     const handleAction = (actionFn) => {
-        actionFn();
         setIsOpen(false);
+        setTimeout(() => actionFn(), 60);
     };
 
     // 바텀 시트 외부 클릭
