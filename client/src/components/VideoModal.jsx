@@ -224,6 +224,7 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete, videos, currentIndex, 
     const [commentsLoading, setCommentsLoading] = useState(false);
     const [commentsDisabled, setCommentsDisabled] = useState(false);
     const [showComments, setShowComments] = useState(false);
+    const [visibleCommentCount, setVisibleCommentCount] = useState(10);
     const [linkCopied, setLinkCopied] = useState(false);
 
     // 저장한 댓글
@@ -1221,7 +1222,8 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete, videos, currentIndex, 
                                     ) : comments.length === 0 ? (
                                         <p className="text-xs text-gray-400 text-center py-3">댓글이 없습니다.</p>
                                     ) : (
-                                        comments.map((comment, idx) => (
+                                        <>
+                                        {comments.slice(0, visibleCommentCount).map((comment, idx) => (
                                             <div key={idx} className="px-3 py-2 bg-gray-50 rounded-lg">
                                                 <div className="flex items-center justify-between mb-1">
                                                     <span className="text-xs font-medium text-gray-700">{comment.author}</span>
@@ -1277,7 +1279,16 @@ const VideoModal = ({ video, onClose, onUpdate, onDelete, videos, currentIndex, 
                                                     </div>
                                                 )}
                                             </div>
-                                        ))
+                                        ))}
+                                        {visibleCommentCount < comments.length && (
+                                            <button
+                                                onClick={() => setVisibleCommentCount(prev => prev + 10)}
+                                                className="w-full py-2 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                                            >
+                                                더보기 ({visibleCommentCount}/{comments.length})
+                                            </button>
+                                        )}
+                                        </>
                                     )}
                                 </div>
                             )}

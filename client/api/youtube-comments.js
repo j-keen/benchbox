@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     }
 
     // YouTube Data API v3 commentThreads endpoint
-    const url = `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${encodeURIComponent(videoId)}&order=relevance&maxResults=10&key=${YOUTUBE_API_KEY}`;
+    const url = `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${encodeURIComponent(videoId)}&order=relevance&maxResults=100&key=${YOUTUBE_API_KEY}`;
 
     const response = await fetch(url);
 

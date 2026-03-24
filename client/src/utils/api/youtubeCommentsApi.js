@@ -33,7 +33,7 @@ export const youtubeCommentsApi = {
         }
         try {
             const ytResponse = await fetch(
-                `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&order=relevance&maxResults=10&key=${youtubeApiKey}`
+                `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&order=relevance&maxResults=100&key=${youtubeApiKey}`
             );
             if (ytResponse.status === 403) return { comments: [], disabled: true };
             if (!ytResponse.ok) throw new Error('YouTube API 호출 실패');
